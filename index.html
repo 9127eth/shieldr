@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHIELDR — Protect the Core</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a1a; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+    #game-container { width: 100vw; height: 100vh; }
+    #game-container canvas { display: block; }
+
+    #username-modal {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #username-modal.hidden { display: none !important; }
+    .modal-box {
+      background: linear-gradient(135deg, #1a1a3e, #0d0d2b);
+      border: 2px solid #4af;
+      border-radius: 16px;
+      padding: 48px 40px;
+      text-align: center;
+      box-shadow: 0 0 80px rgba(68, 170, 255, 0.25);
+      min-width: 340px;
+    }
+    .modal-box h2 {
+      color: #4af;
+      font-size: 22px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .modal-box p {
+      color: #667788;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    #username-input {
+      background: #0a0a1a;
+      border: 2px solid #2a2a4a;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 20px;
+      padding: 12px 20px;
+      text-align: center;
+      width: 260px;
+      outline: none;
+      letter-spacing: 2px;
+      font-family: inherit;
+    }
+    #username-input:focus { border-color: #4af; box-shadow: 0 0 20px rgba(68, 170, 255, 0.15); }
+    #username-submit {
+      display: block;
+      margin: 24px auto 0;
+      background: linear-gradient(135deg, #4af, #27e);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 15px;
+      padding: 12px 44px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: inherit;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    #username-submit:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(68, 170, 255, 0.3); }
+
+    #storage-notice {
+      display: none;
+      position: fixed;
+      bottom: 16px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 170, 0, 0.12);
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      color: #fa0;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div id="username-modal">
+    <div class="modal-box">
+      <h2>Enter Your Guardian Name</h2>
+      <p>Max 12 characters</p>
+      <input type="text" id="username-input" maxlength="12" value="StarWard" autocomplete="off" spellcheck="false" />
+      <button id="username-submit">Begin</button>
+    </div>
+  </div>
+
+  <div id="storage-notice">Storage unavailable — scores won't be saved</div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
