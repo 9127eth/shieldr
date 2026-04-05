@@ -409,6 +409,7 @@ export class GameScene extends Phaser.Scene {
 
       if (dist < PLANET_R + e.size * 0.5) {
         this.enemyHitCore(e, i);
+        if (this.state === 'gameOver') return;
       }
     }
   }
@@ -483,7 +484,7 @@ export class GameScene extends Phaser.Scene {
           }
           p.gfx.destroy();
           this.projectiles.splice(i, 1);
-          if (this.coreHP <= 0) this.triggerGameOver();
+          if (this.coreHP <= 0) { this.triggerGameOver(); return; }
           continue;
         }
       }
