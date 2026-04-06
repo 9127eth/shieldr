@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { StorageManager } from '../storage';
+import { StorageManager, type RunStats } from '../storage';
 import { AudioManager } from '../audio';
 
 export class GameOverScene extends Phaser.Scene {
@@ -8,6 +8,8 @@ export class GameOverScene extends Phaser.Scene {
   private score = 0;
   private wave = 0;
   private mode = 'normal';
+  private runStats: RunStats | null = null;
+  private totalEnemiesDestroyed = 0;
   private particles: { x: number; y: number; vx: number; vy: number; size: number; alpha: number; color: number }[] = [];
   private gfx!: Phaser.GameObjects.Graphics;
 
@@ -19,6 +21,8 @@ export class GameOverScene extends Phaser.Scene {
     this.score = data?.score || 0;
     this.wave = data?.wave || 0;
     this.mode = data?.mode || 'normal';
+    this.runStats = data?.runStats || null;
+    this.totalEnemiesDestroyed = data?.totalEnemiesDestroyed || 0;
   }
 
   create() {
@@ -31,6 +35,9 @@ export class GameOverScene extends Phaser.Scene {
     if (this.mode === 'normal') {
       const name = StorageManager.getGuardianName();
       StorageManager.saveScore(name, this.wave, this.score);
+      if (this.runStats) {
+        StorageManager.updateLifetimeStats(this.runStats, this.wave, this.totalEnemiesDestroyed);
+      }
     }
 
     this.gfx = this.add.graphics();
@@ -38,7 +45,16 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add.rectangle(this.cx, this.cy, this.scale.width, this.scale.height, 0x000000, 0.6).setDepth(0);
 
-    const title = this.add.text(this.cx, this.cy - 120, 'THE CORE HAS FALLEN', {
+    // Layout uses a scrollable container anchored to center
+    const hasStats = !!this.runStats;
+    const bestScore = StorageManager.getPersonalBest(StorageManager.getGuardianName());
+    const playerTitle = StorageManager.getPlayerTitle(StorageManager.getGuardianName());
+    const isNewBest = this.score >= bestScore && this.score > 0 && this.mode === 'normal';
+
+    // -- Title --
+    let yPos = this.cy - 220;
+
+    const title = this.add.text(this.cx, yPos, 'THE CORE HAS FALLEN', {
       fontSize: '42px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',
@@ -46,36 +62,97 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
     title.setShadow(0, 0, '#ff4466', 16, true, true);
 
-    const bestScore = StorageManager.getPersonalBest(StorageManager.getGuardianName());
+    // -- Main score info --
+    yPos += 70;
 
-    this.add.text(this.cx, this.cy - 40, [
-      `SCORE: ${this.score}`,
-      `WAVE REACHED: ${this.wave}`,
-      `PERSONAL BEST: ${bestScore}`,
-    ].join('\n'), {
-      fontSize: '20px',
+    this.add.text(this.cx, yPos, `SCORE: ${this.score}`, {
+      fontSize: '22px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#8899aa',
-      align: 'center',
-      lineSpacing: 10,
+      fontStyle: 'bold',
+      color: '#ccddee',
     }).setOrigin(0.5).setDepth(10);
 
-    if (this.score >= bestScore && this.score > 0 && this.mode === 'normal') {
-      const newBest = this.add.text(this.cx, this.cy + 50, '★ NEW PERSONAL BEST! ★', {
-        fontSize: '18px',
+    yPos += 32;
+
+    const subStats = [`WAVE REACHED: ${this.wave}`, `PERSONAL BEST: ${bestScore}`];
+    if (playerTitle) subStats.push(`RANK: ${playerTitle}`);
+
+    this.add.text(this.cx, yPos, subStats.join('    ·    '), {
+      fontSize: '14px',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#667788',
+    }).setOrigin(0.5).setDepth(10);
+
+    yPos += 28;
+
+    if (isNewBest) {
+      const newBest = this.add.text(this.cx, yPos, '★ NEW PERSONAL BEST! ★', {
+        fontSize: '16px',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
         color: '#ffcc44',
         fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(10);
       this.tweens.add({ targets: newBest, alpha: 0.4, duration: 600, yoyo: true, repeat: -1 });
+      yPos += 30;
     }
 
-    this.createBtn(this.cx, this.cy + 110, '▶ TRY AGAIN', () => {
+    // -- Divider --
+    yPos += 8;
+    const divGfx = this.add.graphics().setDepth(10);
+    divGfx.lineStyle(1, 0x334455, 0.6);
+    divGfx.lineBetween(this.cx - 140, yPos, this.cx + 140, yPos);
+
+    // -- Run Stats --
+    if (hasStats) {
+      yPos += 18;
+
+      this.add.text(this.cx, yPos, 'R U N   S T A T S', {
+        fontSize: '11px',
+        fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#556677',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(10);
+
+      yPos += 24;
+
+      const leftCol = [
+        `Shields Placed:  ${this.runStats!.totalShieldsPlaced}`,
+        `Best Multi-Kill:  ${this.runStats!.bestMultiKill}`,
+        `Perfect Streak:  ${this.runStats!.longestPerfectStreak}`,
+      ];
+      const rightCol = [
+        `${this.runStats!.favoriteSector}`,
+        `Items Used:  ${this.runStats!.itemsUsed}`,
+        `Close Calls:  ${this.runStats!.closeCalls}`,
+      ];
+
+      const colStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+        fontSize: '13px',
+        fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#778899',
+        lineSpacing: 7,
+      };
+
+      this.add.text(this.cx - 10, yPos, leftCol.join('\n'), {
+        ...colStyle, align: 'right',
+      }).setOrigin(1, 0).setDepth(10);
+
+      this.add.text(this.cx + 10, yPos, rightCol.join('\n'), {
+        ...colStyle, align: 'left',
+      }).setOrigin(0, 0).setDepth(10);
+
+      yPos += leftCol.length * 22;
+    }
+
+    // -- Buttons --
+    yPos += 20;
+
+    this.createBtn(this.cx, yPos, '▶ TRY AGAIN', () => {
       audio.playClick();
       this.scene.start('GameScene', { mode: this.mode });
     });
 
-    this.createBtn(this.cx, this.cy + 160, '◀ MAIN MENU', () => {
+    this.createBtn(this.cx, yPos + 45, '◀ MAIN MENU', () => {
       audio.playClick();
       this.scene.start('MenuScene');
     });

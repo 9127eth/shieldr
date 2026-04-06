@@ -100,4 +100,110 @@ export class AudioManager {
   playClick(): void {
     this.osc('sine', 600, 0.04, 0.08, 400);
   }
+
+  playOverchargeDetonate(): void {
+    this.noise(0.15, 0.2);
+    this.osc('sine', 120, 0.3, 0.2, 40);
+    this.osc('sawtooth', 200, 0.2, 0.12, 60);
+  }
+
+  playMultiKill(): void {
+    this.osc('sine', 660, 0.1, 0.1);
+    setTimeout(() => this.osc('sine', 880, 0.1, 0.12), 80);
+    setTimeout(() => this.osc('sine', 1100, 0.15, 0.14), 160);
+  }
+
+  playCloseCall(): void {
+    this.osc('triangle', 500, 0.1, 0.1, 800);
+    setTimeout(() => this.osc('triangle', 700, 0.08, 0.08), 80);
+  }
+
+  playItemCollect(): void {
+    this.osc('sine', 1200, 0.06, 0.1);
+    setTimeout(() => this.osc('sine', 1400, 0.06, 0.1), 50);
+  }
+
+  playRouletteSpinTick(): void {
+    this.osc('square', 900, 0.03, 0.06, 700);
+  }
+
+  playRouletteLand(): void {
+    this.osc('sine', 600, 0.12, 0.1);
+    setTimeout(() => this.osc('sine', 900, 0.12, 0.12), 100);
+    setTimeout(() => this.osc('sine', 1200, 0.2, 0.14), 200);
+  }
+
+  playQueueFull(): void {
+    this.osc('sawtooth', 150, 0.2, 0.1, 100);
+  }
+
+  playShieldBreak(): void {
+    this.noise(0.12, 0.18);
+    this.osc('square', 300, 0.15, 0.1, 80);
+    this.osc('sawtooth', 200, 0.1, 0.08, 60);
+  }
+
+  playBossStagger(): void {
+    this.noise(0.08, 0.1);
+    this.osc('triangle', 250, 0.15, 0.12, 100);
+  }
+
+  playBossDeath(): void {
+    this.noise(0.2, 0.2);
+    this.osc('sine', 200, 0.4, 0.15, 50);
+    setTimeout(() => this.osc('sine', 150, 0.3, 0.12, 40), 200);
+    setTimeout(() => this.noise(0.15, 0.15), 350);
+  }
+
+  playRankUp(): void {
+    this.osc('sine', 523, 0.15, 0.12);
+    setTimeout(() => this.osc('sine', 659, 0.15, 0.12), 120);
+    setTimeout(() => this.osc('sine', 784, 0.15, 0.12), 240);
+    setTimeout(() => this.osc('sine', 1047, 0.3, 0.16), 360);
+  }
+
+  playGravityField(): void {
+    this.osc('sine', 80, 0.4, 0.15, 40);
+    this.osc('triangle', 120, 0.3, 0.1, 50);
+  }
+
+  playTimeBender(): void {
+    this.osc('sine', 600, 0.4, 0.1, 200);
+    this.osc('triangle', 400, 0.5, 0.08, 100);
+  }
+
+  playHealthSurge(): void {
+    this.osc('sine', 400, 0.2, 0.1, 800);
+    setTimeout(() => this.osc('sine', 600, 0.3, 0.12, 1000), 150);
+  }
+
+  playStarBomb(): void {
+    this.noise(0.25, 0.25);
+    this.osc('sine', 150, 0.4, 0.2, 30);
+    this.osc('square', 100, 0.3, 0.15, 25);
+  }
+
+  playTimeFreeze(): void {
+    this.osc('sine', 1200, 0.15, 0.1, 800);
+    this.osc('square', 1000, 0.1, 0.06, 600);
+  }
+
+  playSanctuary(): void {
+    this.osc('sine', 300, 0.3, 0.1, 500);
+    this.osc('triangle', 400, 0.4, 0.08, 600);
+  }
+
+  playCardinalRift(): void {
+    this.osc('sawtooth', 800, 0.12, 0.12, 400);
+    this.noise(0.08, 0.1);
+  }
+
+  playSanctuaryHum(): void {
+    this.osc('sine', 220, 0.5, 0.05);
+    this.osc('sine', 330, 0.5, 0.03);
+  }
+
+  playSanctuaryEnd(): void {
+    this.osc('sine', 500, 0.2, 0.08, 300);
+  }
 }

@@ -108,7 +108,7 @@ Build the full game on top of the Phaser 4 Vite template. Make placing force fie
 
 ---
 
-## Game Improvements
+## Game Improvements Part 1
 
 > The sections below extend and override parts of the base spec above. Where a new rule conflicts with the base spec (e.g. scoring multipliers override "No multipliers or combo system"), the improvement takes precedence.
 
@@ -308,6 +308,7 @@ On the Game Over screen, display the following stats below the main score and wa
 - **Favorite Sector** — divide the screen into 4 quadrants (NE, NW, SE, SW). Show which quadrant the player placed the most shields in. Display as a label like "Northeast Guardian."
 - **Items Used** — total roulette items activated during the run.
 - **Close Calls** — total Close Call bonuses earned.
+- **Shields Per Wave** — average number of shields placed per wave (Total Shields Placed ÷ Highest Wave reached, rounded to one decimal). Gives competitive players a self-optimization metric for shield efficiency without imposing any in-game penalty.
 
 ---
 

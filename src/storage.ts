@@ -2,14 +2,69 @@ export interface LeaderboardEntry {
   name: string;
   wave: number;
   score: number;
+  title: string;
+}
+
+export interface LifetimeStats {
+  totalEnemiesDestroyed: number;
+  totalShieldsPlaced: number;
+  highestWave: number;
+  highestPerfectStreak: number;
+}
+
+export interface RunStats {
+  totalShieldsPlaced: number;
+  bestMultiKill: number;
+  longestPerfectStreak: number;
+  favoriteSector: string;
+  itemsUsed: number;
+  closeCalls: number;
+  sectorCounts: { NE: number; NW: number; SE: number; SW: number };
+}
+
+const TITLE_TIERS: { wave: number; title: string }[] = [
+  { wave: 50, title: 'Eternal' },
+  { wave: 40, title: 'Overlord' },
+  { wave: 30, title: 'Archon' },
+  { wave: 25, title: 'Warden' },
+  { wave: 20, title: 'Sentinel' },
+  { wave: 15, title: 'Guardian' },
+  { wave: 10, title: 'Defender' },
+  { wave: 5, title: 'Watcher' },
+];
+
+export function getTitleForWave(wave: number): string {
+  for (const tier of TITLE_TIERS) {
+    if (wave >= tier.wave) return tier.title;
+  }
+  return '';
+}
+
+export function getNextTitleTier(wave: number): { wave: number; title: string } | null {
+  for (let i = TITLE_TIERS.length - 1; i >= 0; i--) {
+    if (TITLE_TIERS[i].wave > wave) return TITLE_TIERS[i];
+  }
+  return null;
 }
 
 const DEFAULT_ENTRIES: LeaderboardEntry[] = [
-  { name: 'Orion', wave: 14, score: 4200 },
-  { name: 'Nova', wave: 11, score: 3100 },
-  { name: 'Cosmo', wave: 8, score: 1800 },
-  { name: 'Pixel', wave: 5, score: 900 },
+  { name: 'Orion', wave: 14, score: 4200, title: 'Guardian' },
+  { name: 'Nova', wave: 11, score: 3100, title: 'Defender' },
+  { name: 'Cosmo', wave: 8, score: 1800, title: 'Watcher' },
+  { name: 'Pixel', wave: 5, score: 900, title: 'Watcher' },
 ];
+
+export function createRunStats(): RunStats {
+  return {
+    totalShieldsPlaced: 0,
+    bestMultiKill: 0,
+    longestPerfectStreak: 0,
+    favoriteSector: 'NE',
+    itemsUsed: 0,
+    closeCalls: 0,
+    sectorCounts: { NE: 0, NW: 0, SE: 0, SW: 0 },
+  };
+}
 
 export class StorageManager {
   private static _available: boolean | null = null;
@@ -61,7 +116,9 @@ export class StorageManager {
     if (!raw) return [...DEFAULT_ENTRIES];
     try {
       const entries: LeaderboardEntry[] = JSON.parse(raw);
-      return entries.sort((a, b) => b.score - a.score);
+      return entries
+        .map(e => ({ ...e, title: e.title || getTitleForWave(e.wave) }))
+        .sort((a, b) => b.score - a.score);
     } catch {
       return [...DEFAULT_ENTRIES];
     }
@@ -70,14 +127,18 @@ export class StorageManager {
   static saveScore(name: string, wave: number, score: number): void {
     if (!this.available) return;
     const entries = this.getLeaderboard();
+    const title = getTitleForWave(wave);
     const existing = entries.find(e => e.name === name);
     if (existing) {
       if (score > existing.score) {
         existing.score = score;
         existing.wave = wave;
       }
+      if (wave > existing.wave) existing.wave = wave;
+      const bestTitle = getTitleForWave(existing.wave);
+      existing.title = bestTitle;
     } else {
-      entries.push({ name, wave, score });
+      entries.push({ name, wave, score, title });
     }
     entries.sort((a, b) => b.score - a.score);
     localStorage.setItem('shieldr_lb', JSON.stringify(entries));
@@ -86,5 +147,29 @@ export class StorageManager {
   static getPersonalBest(name: string): number {
     const entries = this.getLeaderboard();
     return entries.find(e => e.name === name)?.score || 0;
+  }
+
+  static getPlayerTitle(name: string): string {
+    const entries = this.getLeaderboard();
+    const entry = entries.find(e => e.name === name);
+    if (entry) return entry.title || getTitleForWave(entry.wave);
+    return '';
+  }
+
+  static getLifetimeStats(): LifetimeStats {
+    if (!this.available) return { totalEnemiesDestroyed: 0, totalShieldsPlaced: 0, highestWave: 0, highestPerfectStreak: 0 };
+    const raw = localStorage.getItem('shieldr_lifetime');
+    if (!raw) return { totalEnemiesDestroyed: 0, totalShieldsPlaced: 0, highestWave: 0, highestPerfectStreak: 0 };
+    try { return JSON.parse(raw); } catch { return { totalEnemiesDestroyed: 0, totalShieldsPlaced: 0, highestWave: 0, highestPerfectStreak: 0 }; }
+  }
+
+  static updateLifetimeStats(runStats: RunStats, wave: number, enemiesDestroyed: number): void {
+    if (!this.available) return;
+    const lt = this.getLifetimeStats();
+    lt.totalEnemiesDestroyed += enemiesDestroyed;
+    lt.totalShieldsPlaced += runStats.totalShieldsPlaced;
+    lt.highestWave = Math.max(lt.highestWave, wave);
+    lt.highestPerfectStreak = Math.max(lt.highestPerfectStreak, runStats.longestPerfectStreak);
+    localStorage.setItem('shieldr_lifetime', JSON.stringify(lt));
   }
 }
