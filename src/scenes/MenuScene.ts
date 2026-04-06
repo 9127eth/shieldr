@@ -15,7 +15,13 @@ export class MenuScene extends Phaser.Scene {
   private aboutScrollY = 0;
   private aboutContent!: Phaser.GameObjects.Container;
   private aboutMask!: Phaser.Display.Masks.GeometryMask;
+  private aboutMaskGfx!: Phaser.GameObjects.Graphics;
   private audio!: AudioManager;
+
+  private titleText!: Phaser.GameObjects.Text;
+  private subtitleText!: Phaser.GameObjects.Text;
+  private menuButtons: Phaser.GameObjects.Text[] = [];
+  private volText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('MenuScene');
@@ -30,56 +36,57 @@ export class MenuScene extends Phaser.Scene {
     this.generateStars();
     this.planetGfx = this.add.graphics();
 
-    const title = this.add.text(this.cx, this.cy - 10, 'SHIELDR', {
+    this.titleText = this.add.text(this.cx, this.cy - 10, 'SHIELDR', {
       fontSize: '72px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',
       color: '#44aaff',
     }).setOrigin(0.5).setDepth(10);
-    title.setShadow(0, 0, '#44aaff', 20, true, true);
+    this.titleText.setShadow(0, 0, '#44aaff', 20, true, true);
 
-    this.add.text(this.cx, this.cy + 48, 'PROTECT THE CORE', {
+    this.subtitleText = this.add.text(this.cx, this.cy + 48, 'PROTECT THE CORE', {
       fontSize: '16px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#667788',
     }).setOrigin(0.5).setDepth(10);
 
+    this.menuButtons = [];
     const menuX = this.cx - 100;
 
-    this.createButton(menuX, this.cy + 100, '▶  NORMAL', () => {
+    this.menuButtons.push(this.createButton(menuX, this.cy + 100, '▶  NORMAL', () => {
       this.audio.playClick();
       this.scene.start('GameScene', { mode: 'normal' });
-    });
+    }));
 
-    this.createButton(menuX, this.cy + 145, '◎  PRACTICE', () => {
+    this.menuButtons.push(this.createButton(menuX, this.cy + 145, '◎  PRACTICE', () => {
       this.audio.playClick();
       this.scene.start('GameScene', { mode: 'practice' });
-    });
+    }));
 
-    this.createButton(menuX, this.cy + 190, '☰  LEADERBOARD', () => {
+    this.menuButtons.push(this.createButton(menuX, this.cy + 190, '☰  LEADERBOARD', () => {
       this.audio.playClick();
       this.toggleLeaderboard();
-    });
+    }));
 
-    this.createButton(menuX, this.cy + 235, 'ⓘ  HOW TO PLAY', () => {
+    this.menuButtons.push(this.createButton(menuX, this.cy + 235, 'ⓘ  HOW TO PLAY', () => {
       this.audio.playClick();
       this.toggleAbout();
-    });
+    }));
 
-    const volText = this.add.text(menuX, this.cy + 290, this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF', {
+    this.volText = this.add.text(menuX, this.cy + 290, this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF', {
       fontSize: '14px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#556677',
     }).setOrigin(0, 0.5).setDepth(10).setInteractive({ useHandCursor: true });
 
-    volText.on('pointerdown', () => {
+    this.volText.on('pointerdown', () => {
       this.audio.enabled = !this.audio.enabled;
       StorageManager.setVolume(this.audio.enabled);
-      volText.setText(this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF');
+      this.volText.setText(this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF');
       if (this.audio.enabled) this.audio.playClick();
     });
-    volText.on('pointerover', () => volText.setColor('#aabbcc'));
-    volText.on('pointerout', () => volText.setColor('#556677'));
+    this.volText.on('pointerover', () => this.volText.setColor('#aabbcc'));
+    this.volText.on('pointerout', () => this.volText.setColor('#556677'));
 
     this.buildLeaderboard();
     this.buildAbout();
@@ -94,7 +101,40 @@ export class MenuScene extends Phaser.Scene {
     this.scale.on('resize', (gs: Phaser.Structs.Size) => {
       this.cx = gs.width / 2;
       this.cy = gs.height / 2;
+      this.repositionUI();
     });
+  }
+
+  private repositionUI() {
+    const menuX = this.cx - 100;
+    const buttonOffsets = [100, 145, 190, 235];
+
+    this.titleText.setPosition(this.cx, this.cy - 10);
+    this.subtitleText.setPosition(this.cx, this.cy + 48);
+
+    this.menuButtons.forEach((btn, i) => {
+      btn.setPosition(menuX, this.cy + buttonOffsets[i]);
+    });
+
+    this.volText.setPosition(menuX, this.cy + 290);
+
+    this.leaderboardContainer.setPosition(this.cx, this.cy);
+    this.aboutContainer.setPosition(this.cx, this.cy);
+
+    this.updateAboutMask();
+  }
+
+  private updateAboutMask() {
+    const panelW = 560;
+    const panelH = 520;
+    const contentX = -panelW / 2 + 30;
+    const contentTop = -panelH / 2 + 50;
+    const contentW = panelW - 60;
+    const contentH = panelH - 90;
+
+    this.aboutMaskGfx.clear();
+    this.aboutMaskGfx.fillStyle(0xffffff);
+    this.aboutMaskGfx.fillRect(this.cx + contentX, this.cy + contentTop, contentW, contentH);
   }
 
   update(_time: number, delta: number) {
@@ -234,11 +274,10 @@ export class MenuScene extends Phaser.Scene {
     const contentW = panelW - 60;
     const contentH = panelH - 90;
 
-    // Mask for scrolling
-    const maskShape = this.make.graphics({});
-    maskShape.fillStyle(0xffffff);
-    maskShape.fillRect(this.cx + contentX, this.cy + contentTop, contentW, contentH);
-    this.aboutMask = maskShape.createGeometryMask();
+    this.aboutMaskGfx = this.make.graphics({});
+    this.aboutMaskGfx.fillStyle(0xffffff);
+    this.aboutMaskGfx.fillRect(this.cx + contentX, this.cy + contentTop, contentW, contentH);
+    this.aboutMask = this.aboutMaskGfx.createGeometryMask();
 
     this.aboutContent = this.add.container(0, 0);
     this.aboutContent.setMask(this.aboutMask);

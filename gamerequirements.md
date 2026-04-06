@@ -6,6 +6,7 @@ Create a complete 2D planet-defense game called "Shieldr" in Phaser 4 + TypeScri
 - Leaderboard must be purely client-side (localStorage only) — no external APIs or backends.
 - Game must feel instantly playable the moment the page loads.
 - Desktop only — no mobile or touch support.
+- If a mobile or touch device is detected (small viewport or `navigator.maxTouchPoints > 0`), don't load the game. Instead show a friendly full-screen message: "Shieldr is a desktop experience — grab a mouse and a bigger screen to defend the Core! Mobile coming soon." styled to match the game's neon aesthetic.
 - If localStorage is unavailable (e.g. private browsing), the game still runs but skips saving scores and uses "StarWard" as the default name with an unobtrusive notice.
 
 **Core game concept:**

@@ -206,6 +206,7 @@ export class GameScene extends Phaser.Scene {
   private streakText!: Phaser.GameObjects.Text;
 
   private pauseContainer!: Phaser.GameObjects.Container;
+  private quitConfirmContainer!: Phaser.GameObjects.Container;
   private lbContainer!: Phaser.GameObjects.Container;
   private showingLB = false;
   private tooltip!: Phaser.GameObjects.Text | null;
@@ -343,10 +344,7 @@ export class GameScene extends Phaser.Scene {
   /* ===== INPUT ===== */
 
   private onPointerDown(p: Phaser.Input.Pointer) {
-    if (this.state === 'paused') {
-      this.togglePause();
-      return;
-    }
+    if (this.state === 'paused') return;
     if (this.state === 'gameOver') return;
 
     if (p.rightButtonDown()) {
@@ -2141,24 +2139,16 @@ export class GameScene extends Phaser.Scene {
     this.bestText = this.add.text(0, 12, '', { ...style, color: '#556677', fontSize: '12px' }).setDepth(95);
     this.streakText = this.add.text(0, 12, '', { ...style, color: '#ff8844', fontSize: '13px' }).setDepth(95);
 
-    const lbBtn = this.add.text(0, 12, '☰', {
-      fontSize: '20px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#446688',
-    }).setDepth(95).setInteractive({ useHandCursor: true });
-    lbBtn.on('pointerover', () => lbBtn.setColor('#ffffff'));
-    lbBtn.on('pointerout', () => lbBtn.setColor('#446688'));
-    lbBtn.on('pointerdown', () => this.toggleLB());
-
-    this.scale.on('resize', () => this.repositionHUD(lbBtn));
-    this.repositionHUD(lbBtn);
+    this.scale.on('resize', () => this.repositionHUD());
+    this.repositionHUD();
   }
 
-  private repositionHUD(lbBtn?: Phaser.GameObjects.Text) {
+  private repositionHUD() {
     const w = this.scale.width;
     this.hpText.setPosition(w / 2 - 80, 12);
     this.nameText.setPosition(w - 220, 12);
     this.bestText.setPosition(w - 220, 30);
     this.streakText.setPosition(260, 12);
-    if (lbBtn) lbBtn.setPosition(w - 40, 10);
   }
 
   private updateHUD() {
@@ -2295,12 +2285,82 @@ export class GameScene extends Phaser.Scene {
 
   private createPauseOverlay() {
     this.pauseContainer = this.add.container(0, 0).setDepth(100).setVisible(false);
-    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.7);
-    const txt = this.add.text(this.cx, this.cy, 'PAUSED\nClick to resume', {
+    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.7)
+      .setInteractive();
+    const title = this.add.text(this.cx, this.cy - 60, 'PAUSED', {
       fontSize: '40px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#ffffff', align: 'center', lineSpacing: 12,
+      color: '#ffffff', align: 'center',
     }).setOrigin(0.5);
-    this.pauseContainer.add([bg, txt]);
+
+    const menuX = this.cx - 110;
+
+    const resumeBtn = this.add.text(menuX, this.cy - 5, '▶  RESUME', {
+      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#4499cc', padding: { x: 24, y: 8 },
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    resumeBtn.on('pointerover', () => { resumeBtn.setColor('#ffffff'); resumeBtn.setScale(1.05); });
+    resumeBtn.on('pointerout', () => { resumeBtn.setColor('#4499cc'); resumeBtn.setScale(1); });
+    resumeBtn.on('pointerdown', () => { this.audio.playClick(); this.togglePause(); });
+
+    const lbBtn = this.add.text(menuX, this.cy + 45, '☰  LEADERBOARD', {
+      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#4499cc', padding: { x: 24, y: 8 },
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    lbBtn.on('pointerover', () => { lbBtn.setColor('#ffffff'); lbBtn.setScale(1.05); });
+    lbBtn.on('pointerout', () => { lbBtn.setColor('#4499cc'); lbBtn.setScale(1); });
+    lbBtn.on('pointerdown', () => { this.audio.playClick(); this.toggleLB(); });
+
+    const quitBtn = this.add.text(menuX, this.cy + 95, '✕  QUIT GAME', {
+      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#cc4444', padding: { x: 24, y: 8 },
+    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    quitBtn.on('pointerover', () => { quitBtn.setColor('#ff6666'); quitBtn.setScale(1.05); });
+    quitBtn.on('pointerout', () => { quitBtn.setColor('#cc4444'); quitBtn.setScale(1); });
+    quitBtn.on('pointerdown', () => { this.audio.playClick(); this.showQuitConfirm(); });
+
+    this.pauseContainer.add([bg, title, resumeBtn, lbBtn, quitBtn]);
+
+    this.createQuitConfirmOverlay();
+  }
+
+  private createQuitConfirmOverlay() {
+    this.quitConfirmContainer = this.add.container(0, 0).setDepth(120).setVisible(false);
+    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.8)
+      .setInteractive();
+    const box = this.add.rectangle(this.cx, this.cy, 360, 180, 0x0a0a1a, 0.95).setStrokeStyle(2, 0x335577);
+    const msg = this.add.text(this.cx, this.cy - 40, 'Quit to main menu?\nAll progress will be lost.', {
+      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#ffffff', align: 'center', lineSpacing: 6,
+    }).setOrigin(0.5);
+
+    const yesBtn = this.add.text(this.cx - 60, this.cy + 35, 'YES, QUIT', {
+      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#cc4444', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    yesBtn.on('pointerover', () => { yesBtn.setColor('#ff6666'); yesBtn.setScale(1.05); });
+    yesBtn.on('pointerout', () => { yesBtn.setColor('#cc4444'); yesBtn.setScale(1); });
+    yesBtn.on('pointerdown', () => {
+      this.audio.playClick();
+      this.scene.start('MenuScene');
+    });
+
+    const noBtn = this.add.text(this.cx + 60, this.cy + 35, 'CANCEL', {
+      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#4499cc', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    noBtn.on('pointerover', () => { noBtn.setColor('#ffffff'); noBtn.setScale(1.05); });
+    noBtn.on('pointerout', () => { noBtn.setColor('#4499cc'); noBtn.setScale(1); });
+    noBtn.on('pointerdown', () => { this.audio.playClick(); this.hideQuitConfirm(); });
+
+    this.quitConfirmContainer.add([bg, box, msg, yesBtn, noBtn]);
+  }
+
+  private showQuitConfirm() {
+    this.quitConfirmContainer.setVisible(true);
+  }
+
+  private hideQuitConfirm() {
+    this.quitConfirmContainer.setVisible(false);
   }
 
   private togglePause() {
@@ -2309,6 +2369,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state === 'paused') {
       this.state = this.prevState;
       this.pauseContainer.setVisible(false);
+      this.quitConfirmContainer.setVisible(false);
     } else {
       this.prevState = this.state;
       this.state = 'paused';
