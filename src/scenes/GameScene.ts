@@ -50,6 +50,7 @@ interface Enemy {
   scatterAngle: number;
   scatterTimer: number;
   scatterDuration: number;
+  immuneField: ForceField | null;
 }
 
 interface Projectile {
@@ -64,7 +65,7 @@ interface Orb {
   gfx: Phaser.GameObjects.Graphics;
   x: number; y: number;
   vx: number; vy: number;
-  kind: 'duration' | 'width' | 'reflective';
+  kind: 'duration' | 'width';
   size: number;
   age: number;
   paired: boolean;
@@ -160,7 +161,6 @@ export class GameScene extends Phaser.Scene {
   // Passive upgrades
   private durStacks = 0;
   private widthStacks = 0;
-  private hasReflect = false;
 
   // Perfect Shield Streak
   private perfectStreak = 0;
@@ -234,7 +234,6 @@ export class GameScene extends Phaser.Scene {
     this.spawnQ = [];
     this.durStacks = 0;
     this.widthStacks = 0;
-    this.hasReflect = false;
     this.perfectStreak = 0;
     this.longestPerfectStreak = 0;
     this.streakDurationBonus = 0;
@@ -638,7 +637,7 @@ export class GameScene extends Phaser.Scene {
       hitsRemaining: type === 'shieldBreaker' ? 2 : (type === 'carrier' ? 3 : 1),
       carrierSpawnCd: 3000, carrierDronesSpawned: 0, carrierStaggerTimer: 0,
       siegeOrbitAngle: 0, siegeOrbitRadius: 0, siegeOrbitLaps: 0, siegeEntered: false,
-      scatterAngle: 0, scatterTimer: 0, scatterDuration: 0,
+      scatterAngle: 0, scatterTimer: 0, scatterDuration: 0, immuneField: null,
     };
   }
 
@@ -975,6 +974,7 @@ export class GameScene extends Phaser.Scene {
         drone.scatterAngle = ejectAngle;
         drone.scatterDuration = 600 + Math.random() * 200;
         drone.scatterTimer = drone.scatterDuration;
+        drone.immuneField = ff;
       }
     }
   }
@@ -1092,6 +1092,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (ff.immuneEnemies.has(e)) continue;
+        if (e.immuneField === ff) continue;
 
         // Shield Breaker special handling
         if (e.type === 'shieldBreaker') {
@@ -1148,12 +1149,7 @@ export class GameScene extends Phaser.Scene {
             this.audio.playCloseCall();
           }
 
-          if (this.hasReflect) {
-            this.reflectProjectile(p);
-          } else {
-            p.gfx.destroy();
-            this.projectiles.splice(pi, 1);
-          }
+          this.reflectProjectile(p);
         }
       }
     }
@@ -1479,11 +1475,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getAvailableOrbKinds(): Orb['kind'][] {
-    const kinds: Orb['kind'][] = ['duration', 'width', 'reflective'];
+    const kinds: Orb['kind'][] = ['duration', 'width'];
     return kinds.filter(k => {
       if (k === 'duration' && this.durStacks >= 3) return false;
       if (k === 'width' && this.widthStacks >= 3) return false;
-      if (k === 'reflective' && this.hasReflect) return false;
       return true;
     });
   }
@@ -1518,7 +1513,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const colors: Record<string, number> = {
-      duration: 0x44ff44, width: 0x4488ff, reflective: 0xaa44ff,
+      duration: 0x44ff44, width: 0x4488ff,
     };
 
     const gfx = this.add.graphics().setDepth(6);
@@ -1579,10 +1574,6 @@ export class GameScene extends Phaser.Scene {
       case 'width':
         this.widthStacks = Math.min(3, this.widthStacks + 1);
         label = `SHIELD WIDTH +${this.widthStacks * 25}%`;
-        break;
-      case 'reflective':
-        this.hasReflect = true;
-        label = 'REFLECTIVE SHIELD';
         break;
     }
 
@@ -2209,11 +2200,6 @@ export class GameScene extends Phaser.Scene {
 
     // Active upgrade indicators
     let indicatorX = this.scale.width / 2 + 100;
-    if (this.hasReflect) {
-      this.hudGfx.fillStyle(0xaa44ff, 0.6);
-      this.hudGfx.fillCircle(indicatorX, 20, 6);
-      indicatorX += 18;
-    }
     if (this.durStacks > 0) {
       this.hudGfx.fillStyle(0x44ff44, 0.6);
       this.hudGfx.fillCircle(indicatorX, 20, 6);

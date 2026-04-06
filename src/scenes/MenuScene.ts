@@ -387,8 +387,10 @@ export class MenuScene extends Phaser.Scene {
       'Green orb. Shields last 3s longer. Stacks 3 times (max +9s).', y);
     y += item('Width+', '#4488ff',
       'Blue orb. Shields become 25% wider. Stacks 3 times.', y);
-    y += item('Reflective Shield', '#aa44ff',
-      'Purple orb. Shields bounce enemy projectiles back at enemies. One-time pickup.', y);
+    y += body(
+      'Shields always reflect enemy projectiles back at the nearest enemy.',
+      y,
+    );
     y += body(
       'Every 3rd orb spawn shows 2 orbs side by side — pick one, the other fades.',
       y,
