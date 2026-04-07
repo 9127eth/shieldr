@@ -1528,14 +1528,15 @@ export class GameScene extends Phaser.Scene {
 
   private updateOrbs(delta: number) {
     const dt = delta / 1000;
+    const timeMul = this.getEnemySpeedMultiplier();
     const w = this.scale.width;
     const h = this.scale.height;
 
     for (let i = this.orbs.length - 1; i >= 0; i--) {
       const o = this.orbs[i];
-      o.x += o.vx * dt;
-      o.y += o.vy * dt;
-      o.age += delta;
+      o.x += o.vx * dt * timeMul;
+      o.y += o.vy * dt * timeMul;
+      o.age += delta * timeMul;
       o.gfx.setPosition(o.x, o.y);
 
       const pulse = 1 + Math.sin(o.age * 0.005) * 0.1;
@@ -1610,16 +1611,17 @@ export class GameScene extends Phaser.Scene {
   private updateItemBox(delta: number) {
     if (!this.itemBox) return;
     const dt = delta / 1000;
+    const timeMul = this.getEnemySpeedMultiplier();
     const ib = this.itemBox;
-    ib.age += delta;
+    ib.age += delta * timeMul;
 
     // Gradual ramp: no speed/wobble change for first 3s, then eases in
     const rampStart = 3000;
     const elapsed = Math.max(0, ib.age - rampStart);
     const speedMul = 1 + elapsed * 0.0004;
 
-    ib.x += ib.vx * speedMul * dt;
-    ib.y += ib.vy * speedMul * dt;
+    ib.x += ib.vx * speedMul * dt * timeMul;
+    ib.y += ib.vy * speedMul * dt * timeMul;
 
     // Wobble grows from 0 after rampStart
     const wobbleAmp = Math.min(50, elapsed * 0.008);
