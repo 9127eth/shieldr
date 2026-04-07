@@ -144,6 +144,29 @@ export class StorageManager {
     localStorage.setItem('shieldr_lb', JSON.stringify(entries));
   }
 
+  static renameGuardian(newName: string): void {
+    const oldName = this.getGuardianName();
+    if (oldName === newName) return;
+    this.setGuardianName(newName);
+    if (!this.available) return;
+    const entries = this.getLeaderboard();
+    const entry = entries.find(e => e.name === oldName);
+    if (entry) {
+      const existing = entries.find(e => e.name === newName);
+      if (existing) {
+        if (entry.score > existing.score) existing.score = entry.score;
+        if (entry.wave > existing.wave) existing.wave = entry.wave;
+        existing.title = getTitleForWave(existing.wave);
+        const filtered = entries.filter(e => e.name !== oldName);
+        filtered.sort((a, b) => b.score - a.score);
+        localStorage.setItem('shieldr_lb', JSON.stringify(filtered));
+      } else {
+        entry.name = newName;
+        localStorage.setItem('shieldr_lb', JSON.stringify(entries));
+      }
+    }
+  }
+
   static getPersonalBest(name: string): number {
     const entries = this.getLeaderboard();
     return entries.find(e => e.name === name)?.score || 0;

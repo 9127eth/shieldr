@@ -22,6 +22,7 @@ export class MenuScene extends Phaser.Scene {
   private subtitleText!: Phaser.GameObjects.Text;
   private menuButtons: Phaser.GameObjects.Text[] = [];
   private volText!: Phaser.GameObjects.Text;
+  private nameText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('MenuScene');
@@ -88,6 +89,20 @@ export class MenuScene extends Phaser.Scene {
     this.volText.on('pointerover', () => this.volText.setColor('#aabbcc'));
     this.volText.on('pointerout', () => this.volText.setColor('#556677'));
 
+    const currentName = StorageManager.getGuardianName();
+    this.nameText = this.add.text(menuX, this.cy + 325, `✎ ${currentName}`, {
+      fontSize: '14px',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#556677',
+    }).setOrigin(0, 0.5).setDepth(10).setInteractive({ useHandCursor: true });
+
+    this.nameText.on('pointerdown', () => {
+      this.audio.playClick();
+      this.promptNameChange();
+    });
+    this.nameText.on('pointerover', () => this.nameText.setColor('#aabbcc'));
+    this.nameText.on('pointerout', () => this.nameText.setColor('#556677'));
+
     this.buildLeaderboard();
     this.buildAbout();
 
@@ -117,6 +132,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.volText.setPosition(menuX, this.cy + 290);
+    this.nameText.setPosition(menuX, this.cy + 325);
 
     this.leaderboardContainer.setPosition(this.cx, this.cy);
     this.aboutContainer.setPosition(this.cx, this.cy);
@@ -196,6 +212,21 @@ export class MenuScene extends Phaser.Scene {
     btn.on('pointerout', () => { btn.setColor('#4499cc'); btn.setScale(1); });
     btn.on('pointerdown', cb);
     return btn;
+  }
+
+  private promptNameChange() {
+    const openModal = (window as any).shieldrOpenNameModal;
+    if (!openModal) return;
+    const oldName = StorageManager.getGuardianName();
+    openModal(oldName, (newName: string) => {
+      StorageManager.renameGuardian(newName);
+      this.nameText.setText(`✎ ${newName}`);
+      if (this.showingLB) {
+        this.leaderboardContainer.destroy();
+        this.buildLeaderboard();
+        this.leaderboardContainer.setVisible(true);
+      }
+    });
   }
 
   /* ===== LEADERBOARD ===== */

@@ -23,26 +23,39 @@ const input = document.getElementById('username-input') as HTMLInputElement;
 const submit = document.getElementById('username-submit')!;
 const notice = document.getElementById('storage-notice')!;
 
+let nameModalCallback: ((name: string) => void) | null = null;
+
+function openNameModal(currentName: string, onDone: (name: string) => void) {
+  input.value = currentName;
+  nameModalCallback = onDone;
+  modal.classList.remove('hidden');
+  input.focus();
+  input.select();
+}
+
+function confirmName() {
+  const name = input.value.trim().slice(0, 12) || 'StarWard';
+  StorageManager.setGuardianName(name);
+  StorageManager.setSeenIntro();
+  modal.classList.add('hidden');
+  if (nameModalCallback) {
+    nameModalCallback(name);
+    nameModalCallback = null;
+  }
+}
+
+submit.addEventListener('click', confirmName);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') confirmName();
+});
+
 if (!StorageManager.available) {
   modal.classList.add('hidden');
   notice.style.display = 'block';
 } else if (StorageManager.hasSeenIntro()) {
   modal.classList.add('hidden');
-} else {
-  input.focus();
-  input.select();
-
-  const confirm = () => {
-    const name = input.value.trim().slice(0, 12) || 'StarWard';
-    StorageManager.setGuardianName(name);
-    StorageManager.setSeenIntro();
-    modal.classList.add('hidden');
-  };
-
-  submit.addEventListener('click', confirm);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') confirm();
-  });
 }
+
+(window as any).shieldrOpenNameModal = openNameModal;
 
 export { game };

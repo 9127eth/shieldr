@@ -766,12 +766,22 @@ export class GameScene extends Phaser.Scene {
 
       // Phaser flicker logic
       if (e.type === 'phaser') {
+        const wasPhaserVisible = e.phaserVisible;
         e.phaserTimer += delta;
-        const cycle = 1600; // 0.8s visible + 0.8s invisible
+        const cycle = 1600;
         const phase = e.phaserTimer % cycle;
         e.phaserVisible = phase < 800;
         const drawAlpha = e.phaserVisible ? 1 : 0.1;
         this.drawEnemyShape(e.gfx, 'phaser', e.size, drawAlpha);
+
+        if (!wasPhaserVisible && e.phaserVisible) {
+          const cr = e.size + FIELD_COLLISION_R + this.widthStacks * 3;
+          for (const ff of this.fields) {
+            if (this.lineCircle(ff.x1, ff.y1, ff.x2, ff.y2, e.x, e.y, cr)) {
+              ff.immuneEnemies.add(e);
+            }
+          }
+        }
       }
 
       // Carrier boss logic
@@ -899,7 +909,6 @@ export class GameScene extends Phaser.Scene {
   private enemyHitCore(e: Enemy, idx: number) {
     if (this.mode !== 'practice') {
       if (this.sanctuaryTimer > 0) {
-        // Sanctuary active: enemy is destroyed but deals no damage
         this.score += e.points;
         this.totalEnemiesDestroyed++;
         this.spawnExplosion(e.x, e.y, 0xffcc44);
@@ -912,8 +921,8 @@ export class GameScene extends Phaser.Scene {
       this.perfectWave = false;
       this.perfectStreak = 0;
       this.streakDurationBonus = 0;
-      this.coreHitEffect();
     }
+    this.coreHitEffect();
     e.gfx.destroy();
     this.enemies.splice(idx, 1);
     if (this.coreHP <= 0) this.triggerGameOver();
@@ -1052,8 +1061,10 @@ export class GameScene extends Phaser.Scene {
               this.perfectWave = false;
               this.perfectStreak = 0;
               this.streakDurationBonus = 0;
-              this.coreHitEffect();
             }
+          }
+          if (this.mode === 'practice' || this.sanctuaryTimer <= 0) {
+            this.coreHitEffect();
           }
           p.gfx.destroy();
           this.projectiles.splice(i, 1);
