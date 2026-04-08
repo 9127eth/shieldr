@@ -45,75 +45,77 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add.rectangle(this.cx, this.cy, this.scale.width, this.scale.height, 0x000000, 0.6).setDepth(0);
 
-    // Layout uses a scrollable container anchored to center
+    const m = !this.sys.game.device.os.desktop;
     const hasStats = !!this.runStats;
     const bestScore = StorageManager.getPersonalBest(StorageManager.getGuardianName());
     const playerTitle = StorageManager.getPlayerTitle(StorageManager.getGuardianName());
     const isNewBest = this.score >= bestScore && this.score > 0 && this.mode === 'competitive';
 
     // -- Title --
-    let yPos = this.cy - 220;
+    let yPos = m ? Math.max(30, this.scale.height * 0.08) : this.cy - 220;
 
     const title = this.add.text(this.cx, yPos, 'THE CORE HAS FALLEN', {
-      fontSize: '42px',
+      fontSize: m ? '28px' : '42px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',
       color: '#ff4466',
     }).setOrigin(0.5).setDepth(10);
-    title.setShadow(0, 0, '#ff4466', 16, true, true);
+    title.setShadow(0, 0, '#ff4466', m ? 8 : 16, true, true);
 
     // -- Main score info --
-    yPos += 70;
+    yPos += m ? 48 : 70;
 
     this.add.text(this.cx, yPos, `SCORE: ${this.score}`, {
-      fontSize: '22px',
+      fontSize: m ? '18px' : '22px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',
       color: '#ccddee',
     }).setOrigin(0.5).setDepth(10);
 
-    yPos += 32;
+    yPos += m ? 24 : 32;
 
     const subStats = [`WAVE REACHED: ${this.wave}`, `PERSONAL BEST: ${bestScore}`];
     if (playerTitle) subStats.push(`RANK: ${playerTitle}`);
 
-    this.add.text(this.cx, yPos, subStats.join('    ·    '), {
-      fontSize: '14px',
+    const subText = this.add.text(this.cx, yPos, subStats.join(m ? '\n' : '    ·    '), {
+      fontSize: m ? '12px' : '14px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#667788',
+      align: 'center',
     }).setOrigin(0.5).setDepth(10);
 
-    yPos += 28;
+    yPos += m ? subText.height + 6 : 28;
 
     if (isNewBest) {
       const newBest = this.add.text(this.cx, yPos, '★ NEW PERSONAL BEST! ★', {
-        fontSize: '16px',
+        fontSize: m ? '13px' : '16px',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
         color: '#ffcc44',
         fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(10);
       this.tweens.add({ targets: newBest, alpha: 0.4, duration: 600, yoyo: true, repeat: -1 });
-      yPos += 30;
+      yPos += m ? 20 : 30;
     }
 
     // -- Divider --
-    yPos += 8;
+    yPos += m ? 4 : 8;
     const divGfx = this.add.graphics().setDepth(10);
     divGfx.lineStyle(1, 0x334455, 0.6);
-    divGfx.lineBetween(this.cx - 140, yPos, this.cx + 140, yPos);
+    const divW = m ? 100 : 140;
+    divGfx.lineBetween(this.cx - divW, yPos, this.cx + divW, yPos);
 
     // -- Run Stats --
     if (hasStats) {
-      yPos += 18;
+      yPos += m ? 12 : 18;
 
       this.add.text(this.cx, yPos, 'R U N   S T A T S', {
-        fontSize: '11px',
+        fontSize: m ? '10px' : '11px',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
         color: '#556677',
         fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(10);
 
-      yPos += 24;
+      yPos += m ? 18 : 24;
 
       const leftCol = [
         `Shields Placed:  ${this.runStats!.totalShieldsPlaced}`,
@@ -127,10 +129,10 @@ export class GameOverScene extends Phaser.Scene {
       ];
 
       const colStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-        fontSize: '13px',
+        fontSize: m ? '11px' : '13px',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
         color: '#778899',
-        lineSpacing: 7,
+        lineSpacing: m ? 4 : 7,
       };
 
       this.add.text(this.cx - 10, yPos, leftCol.join('\n'), {
@@ -141,21 +143,22 @@ export class GameOverScene extends Phaser.Scene {
         ...colStyle, align: 'left',
       }).setOrigin(0, 0).setDepth(10);
 
-      yPos += leftCol.length * 22;
+      yPos += leftCol.length * (m ? 17 : 22);
     }
 
     // -- Buttons --
-    yPos += 20;
+    yPos += m ? 14 : 20;
+    const btnGap = m ? 36 : 45;
 
     this.createBtn(this.cx, yPos, '▶ TRY AGAIN', () => {
       audio.playClick();
       this.scene.start('GameScene', { mode: this.mode });
-    });
+    }, m);
 
-    this.createBtn(this.cx, yPos + 45, '◀ MAIN MENU', () => {
+    this.createBtn(this.cx, yPos + btnGap, '◀ MAIN MENU', () => {
       audio.playClick();
       this.scene.start('MenuScene');
-    });
+    }, m);
   }
 
   update(_time: number, delta: number) {
@@ -188,12 +191,12 @@ export class GameOverScene extends Phaser.Scene {
     }
   }
 
-  private createBtn(x: number, y: number, label: string, cb: () => void) {
+  private createBtn(x: number, y: number, label: string, cb: () => void, mobile = false) {
     const btn = this.add.text(x, y, label, {
-      fontSize: '20px',
+      fontSize: mobile ? '17px' : '20px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#4499cc',
-      padding: { x: 20, y: 6 },
+      padding: { x: mobile ? 14 : 20, y: mobile ? 4 : 6 },
     }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => { btn.setColor('#ffffff'); btn.setScale(1.05); });
     btn.on('pointerout', () => { btn.setColor('#4499cc'); btn.setScale(1); });

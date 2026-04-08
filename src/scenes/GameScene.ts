@@ -219,7 +219,6 @@ export class GameScene extends Phaser.Scene {
   private practicePanelBounds = { x: 0, y: 0, w: 0, h: 0 };
   private practicePanelExpanded = true;
   private isMobile = false;
-  private mobileItemBtn: Phaser.GameObjects.Text | null = null;
 
   constructor() { super('GameScene'); }
 
@@ -263,7 +262,6 @@ export class GameScene extends Phaser.Scene {
     this.tooltip = null;
     this.practicePanel = null;
     this.practicePanelExpanded = true;
-    this.mobileItemBtn = null;
     this.midWaveOrbRoll = false;
     this.orbSpawnCount = 0;
     this.runStats = createRunStats();
@@ -311,7 +309,6 @@ export class GameScene extends Phaser.Scene {
       this.cx = gs.width / 2;
       this.cy = gs.height / 2;
       this.repositionPracticePanel();
-      this.repositionMobileItemBtn();
     });
 
     this.startNextWave();
@@ -320,9 +317,6 @@ export class GameScene extends Phaser.Scene {
       this.createPracticeSpawnPanel();
     }
 
-    if (this.isMobile) {
-      this.createMobileItemButton();
-    }
   }
 
   update(_time: number, delta: number) {
@@ -365,7 +359,10 @@ export class GameScene extends Phaser.Scene {
     if (this.state === 'paused') return;
     if (this.state === 'gameOver') return;
     if (this.practicePanel && this.isInPracticePanel(p.x, p.y)) return;
-    if (this.mobileItemBtn && this.isInMobileItemBtn(p.x, p.y)) return;
+    if (this.isMobile && this.isInItemSlot(p.x, p.y)) {
+      this.useItem(this.cx, this.cy);
+      return;
+    }
 
     if (p.rightButtonDown()) {
       this.useItem(p.x, p.y);
@@ -1736,7 +1733,7 @@ export class GameScene extends Phaser.Scene {
       this.firstItemEarned = true;
       if (!this.itemTutorialShown) {
         this.itemTutorialShown = true;
-        const tutorialMsg = this.isMobile ? 'Tap item button to use' : 'Right-click to use item';
+        const tutorialMsg = this.isMobile ? 'Tap item slot to use' : 'Right-click to use item';
         this.itemTutorialText = this.add.text(this.cx, this.scale.height - 100, tutorialMsg, {
           fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#667799',
         }).setOrigin(0.5).setDepth(50);
@@ -2196,7 +2193,6 @@ export class GameScene extends Phaser.Scene {
       this.bestText.setPosition(w - 220, 30);
       this.streakText.setPosition(260, 12);
     }
-    this.repositionMobileItemBtn();
   }
 
   private updateHUD() {
@@ -2268,7 +2264,6 @@ export class GameScene extends Phaser.Scene {
       this.hudGfx.fillRoundedRect(this.cx - 50, 66, 100 * (this.starShieldTimer / 8000), 4, 2);
     }
 
-    this.updateMobileItemButton();
   }
 
   private drawItemQueue() {
@@ -2587,52 +2582,18 @@ export class GameScene extends Phaser.Scene {
     return px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
   }
 
-  /* ===== MOBILE ITEM BUTTON ===== */
+  /* ===== MOBILE ITEM SLOT TAP ===== */
 
-  private createMobileItemButton() {
-    this.mobileItemBtn = this.add.text(0, 0, '⬡ NO ITEM', {
-      fontSize: '14px',
-      fontFamily: '"Segoe UI", system-ui, sans-serif',
-      fontStyle: 'bold',
-      color: '#334455',
-      backgroundColor: '#0d0d20',
-      padding: { x: 14, y: 10 },
-    }).setOrigin(1, 1).setDepth(95).setAlpha(0.4).setInteractive();
-
-    this.mobileItemBtn.on('pointerdown', () => {
-      if (this.state === 'paused' || this.state === 'gameOver') return;
-      if (!this.itemQueue[0].item) return;
-      this.useItem(this.cx, this.cy);
-    });
-
-    this.repositionMobileItemBtn();
-  }
-
-  private repositionMobileItemBtn() {
-    if (!this.mobileItemBtn) return;
-    this.mobileItemBtn.setPosition(this.scale.width - 10, this.scale.height - 10);
-  }
-
-  private updateMobileItemButton() {
-    if (!this.mobileItemBtn) return;
-    const hasItem = !!this.itemQueue[0].item;
-    if (hasItem) {
-      const item = this.itemQueue[0].item!;
-      const color = '#' + ITEM_COLORS[item].toString(16).padStart(6, '0');
-      this.mobileItemBtn.setText(`⬡ ${ITEM_LABELS[item]}`);
-      this.mobileItemBtn.setColor(color);
-      this.mobileItemBtn.setAlpha(1);
-    } else {
-      this.mobileItemBtn.setText('⬡ NO ITEM');
-      this.mobileItemBtn.setColor('#334455');
-      this.mobileItemBtn.setAlpha(0.4);
-    }
-  }
-
-  private isInMobileItemBtn(px: number, py: number): boolean {
-    if (!this.mobileItemBtn || !this.mobileItemBtn.visible) return false;
-    const bounds = this.mobileItemBtn.getBounds();
-    return bounds.contains(px, py);
+  private isInItemSlot(px: number, py: number): boolean {
+    if (!this.itemQueue[0].item) return false;
+    const slotW = 36;
+    const gap = 8;
+    const totalW = slotW * 2 + gap;
+    const baseX = this.cx - totalW / 2;
+    const baseY = 48;
+    const pad = 8;
+    return px >= baseX - pad && px <= baseX + slotW + pad
+        && py >= baseY - pad && py <= baseY + slotW + pad;
   }
 
   /* ===== GAME OVER ===== */
