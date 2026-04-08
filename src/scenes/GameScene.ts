@@ -218,6 +218,8 @@ export class GameScene extends Phaser.Scene {
   private practicePanel: Phaser.GameObjects.Container | null = null;
   private practicePanelBounds = { x: 0, y: 0, w: 0, h: 0 };
   private practicePanelExpanded = true;
+  private isMobile = false;
+  private mobileItemBtn: Phaser.GameObjects.Text | null = null;
 
   constructor() { super('GameScene'); }
 
@@ -261,6 +263,7 @@ export class GameScene extends Phaser.Scene {
     this.tooltip = null;
     this.practicePanel = null;
     this.practicePanelExpanded = true;
+    this.mobileItemBtn = null;
     this.midWaveOrbRoll = false;
     this.orbSpawnCount = 0;
     this.runStats = createRunStats();
@@ -271,6 +274,7 @@ export class GameScene extends Phaser.Scene {
     this.cx = this.scale.width / 2;
     this.cy = this.scale.height / 2;
     this.audio = AudioManager.getInstance();
+    this.isMobile = !this.sys.game.device.os.desktop;
 
     this.generateStars();
 
@@ -293,7 +297,7 @@ export class GameScene extends Phaser.Scene {
     if (!StorageManager.hasSeenIntro() || this.mode === 'practice') {
       const msg = this.mode === 'practice'
         ? 'PRACTICE MODE — No damage, no score recording'
-        : 'Click anywhere to place a force field — protect the Core!';
+        : `${this.isMobile ? 'Tap' : 'Click'} anywhere to place a force field — protect the Core!`;
       this.tooltip = this.add.text(this.cx, this.cy + PLANET_R + 60, msg, {
         fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#667799',
       }).setOrigin(0.5).setDepth(50);
@@ -307,12 +311,17 @@ export class GameScene extends Phaser.Scene {
       this.cx = gs.width / 2;
       this.cy = gs.height / 2;
       this.repositionPracticePanel();
+      this.repositionMobileItemBtn();
     });
 
     this.startNextWave();
 
     if (this.mode === 'practice') {
       this.createPracticeSpawnPanel();
+    }
+
+    if (this.isMobile) {
+      this.createMobileItemButton();
     }
   }
 
@@ -356,6 +365,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state === 'paused') return;
     if (this.state === 'gameOver') return;
     if (this.practicePanel && this.isInPracticePanel(p.x, p.y)) return;
+    if (this.mobileItemBtn && this.isInMobileItemBtn(p.x, p.y)) return;
 
     if (p.rightButtonDown()) {
       this.useItem(p.x, p.y);
@@ -1726,7 +1736,8 @@ export class GameScene extends Phaser.Scene {
       this.firstItemEarned = true;
       if (!this.itemTutorialShown) {
         this.itemTutorialShown = true;
-        this.itemTutorialText = this.add.text(this.cx, this.scale.height - 100, 'Right-click to use item', {
+        const tutorialMsg = this.isMobile ? 'Tap item button to use' : 'Right-click to use item';
+        this.itemTutorialText = this.add.text(this.cx, this.scale.height - 100, tutorialMsg, {
           fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#667799',
         }).setOrigin(0.5).setDepth(50);
         this.time.delayedCall(5000, () => {
@@ -2151,16 +2162,22 @@ export class GameScene extends Phaser.Scene {
   /* ===== HUD ===== */
 
   private createHUD() {
+    const fs = this.isMobile ? '12px' : '15px';
     const style: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: '15px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#8899aa',
+      fontSize: fs, fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#8899aa',
     };
 
     this.waveText = this.add.text(16, 12, '', style).setDepth(95);
     this.scoreText = this.add.text(140, 12, '', style).setDepth(95);
     this.hpText = this.add.text(0, 12, '', style).setDepth(95);
     this.nameText = this.add.text(0, 12, '', { ...style, color: '#556677' }).setDepth(95);
-    this.bestText = this.add.text(0, 12, '', { ...style, color: '#556677', fontSize: '12px' }).setDepth(95);
-    this.streakText = this.add.text(0, 12, '', { ...style, color: '#ff8844', fontSize: '13px' }).setDepth(95);
+    this.bestText = this.add.text(0, 12, '', { ...style, color: '#556677', fontSize: this.isMobile ? '10px' : '12px' }).setDepth(95);
+    this.streakText = this.add.text(0, 12, '', { ...style, color: '#ff8844', fontSize: this.isMobile ? '11px' : '13px' }).setDepth(95);
+
+    if (this.isMobile) {
+      this.nameText.setVisible(false);
+      this.bestText.setVisible(false);
+    }
 
     this.scale.on('resize', () => this.repositionHUD());
     this.repositionHUD();
@@ -2168,19 +2185,32 @@ export class GameScene extends Phaser.Scene {
 
   private repositionHUD() {
     const w = this.scale.width;
-    this.hpText.setPosition(w / 2 - 80, 12);
-    this.nameText.setPosition(w - 220, 12);
-    this.bestText.setPosition(w - 220, 30);
-    this.streakText.setPosition(260, 12);
+    if (this.isMobile) {
+      this.waveText.setPosition(10, 8);
+      this.hpText.setPosition(w / 2, 8).setOrigin(0.5, 0);
+      this.scoreText.setPosition(w - 10, 8).setOrigin(1, 0);
+      this.streakText.setPosition(10, 26);
+    } else {
+      this.hpText.setPosition(w / 2 - 80, 12);
+      this.nameText.setPosition(w - 220, 12);
+      this.bestText.setPosition(w - 220, 30);
+      this.streakText.setPosition(260, 12);
+    }
+    this.repositionMobileItemBtn();
   }
 
   private updateHUD() {
-    this.waveText.setText(`WAVE ${this.currentWave}`);
-    this.scoreText.setText(`SCORE ${this.score}`);
+    if (this.isMobile) {
+      this.waveText.setText(`W${this.currentWave}`);
+      this.scoreText.setText(`${this.score}`);
+    } else {
+      this.waveText.setText(`WAVE ${this.currentWave}`);
+      this.scoreText.setText(`SCORE ${this.score}`);
+    }
 
     const hpRatio = this.coreHP / this.maxHP;
     const hpPct = Math.round(hpRatio * 100);
-    this.hpText.setText(`CORE ${hpPct}%`);
+    this.hpText.setText(this.isMobile ? `${hpPct}%` : `CORE ${hpPct}%`);
     this.hpText.setColor(hpRatio > 0.6 ? '#44ff88' : hpRatio > 0.3 ? '#ffaa44' : '#ff4466');
 
     const name = StorageManager.getGuardianName();
@@ -2237,6 +2267,8 @@ export class GameScene extends Phaser.Scene {
       this.hudGfx.fillStyle(0xffcc44, 0.3);
       this.hudGfx.fillRoundedRect(this.cx - 50, 66, 100 * (this.starShieldTimer / 8000), 4, 2);
     }
+
+    this.updateMobileItemButton();
   }
 
   private drawItemQueue() {
@@ -2553,6 +2585,54 @@ export class GameScene extends Phaser.Scene {
   private isInPracticePanel(px: number, py: number): boolean {
     const b = this.practicePanelBounds;
     return px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
+  }
+
+  /* ===== MOBILE ITEM BUTTON ===== */
+
+  private createMobileItemButton() {
+    this.mobileItemBtn = this.add.text(0, 0, '⬡ NO ITEM', {
+      fontSize: '14px',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      fontStyle: 'bold',
+      color: '#334455',
+      backgroundColor: '#0d0d20',
+      padding: { x: 14, y: 10 },
+    }).setOrigin(1, 1).setDepth(95).setAlpha(0.4).setInteractive();
+
+    this.mobileItemBtn.on('pointerdown', () => {
+      if (this.state === 'paused' || this.state === 'gameOver') return;
+      if (!this.itemQueue[0].item) return;
+      this.useItem(this.cx, this.cy);
+    });
+
+    this.repositionMobileItemBtn();
+  }
+
+  private repositionMobileItemBtn() {
+    if (!this.mobileItemBtn) return;
+    this.mobileItemBtn.setPosition(this.scale.width - 10, this.scale.height - 10);
+  }
+
+  private updateMobileItemButton() {
+    if (!this.mobileItemBtn) return;
+    const hasItem = !!this.itemQueue[0].item;
+    if (hasItem) {
+      const item = this.itemQueue[0].item!;
+      const color = '#' + ITEM_COLORS[item].toString(16).padStart(6, '0');
+      this.mobileItemBtn.setText(`⬡ ${ITEM_LABELS[item]}`);
+      this.mobileItemBtn.setColor(color);
+      this.mobileItemBtn.setAlpha(1);
+    } else {
+      this.mobileItemBtn.setText('⬡ NO ITEM');
+      this.mobileItemBtn.setColor('#334455');
+      this.mobileItemBtn.setAlpha(0.4);
+    }
+  }
+
+  private isInMobileItemBtn(px: number, py: number): boolean {
+    if (!this.mobileItemBtn || !this.mobileItemBtn.visible) return false;
+    const bounds = this.mobileItemBtn.getBounds();
+    return bounds.contains(px, py);
   }
 
   /* ===== GAME OVER ===== */
