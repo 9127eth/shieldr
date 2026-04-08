@@ -219,6 +219,7 @@ export class GameScene extends Phaser.Scene {
   private practicePanelBounds = { x: 0, y: 0, w: 0, h: 0 };
   private practicePanelExpanded = true;
   private isMobile = false;
+  private menuBtn: Phaser.GameObjects.Text | null = null;
 
   constructor() { super('GameScene'); }
 
@@ -262,6 +263,7 @@ export class GameScene extends Phaser.Scene {
     this.tooltip = null;
     this.practicePanel = null;
     this.practicePanelExpanded = true;
+    this.menuBtn = null;
     this.midWaveOrbRoll = false;
     this.orbSpawnCount = 0;
     this.runStats = createRunStats();
@@ -313,7 +315,7 @@ export class GameScene extends Phaser.Scene {
 
     this.startNextWave();
 
-    if (this.mode === 'practice') {
+    if (this.mode === 'practice' && !this.isMobile) {
       this.createPracticeSpawnPanel();
     }
 
@@ -359,6 +361,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state === 'paused') return;
     if (this.state === 'gameOver') return;
     if (this.practicePanel && this.isInPracticePanel(p.x, p.y)) return;
+    if (this.menuBtn && this.menuBtn.getBounds().contains(p.x, p.y)) return;
     if (this.isMobile && this.isInItemSlot(p.x, p.y)) {
       this.useItem(this.cx, this.cy);
       return;
@@ -2174,6 +2177,14 @@ export class GameScene extends Phaser.Scene {
     if (this.isMobile) {
       this.nameText.setVisible(false);
       this.bestText.setVisible(false);
+
+      this.menuBtn = this.add.text(0, 0, '☰', {
+        fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
+      }).setOrigin(1, 0).setDepth(95).setInteractive();
+      this.menuBtn.on('pointerdown', () => {
+        this.audio.playClick();
+        this.togglePause();
+      });
     }
 
     this.scale.on('resize', () => this.repositionHUD());
@@ -2185,8 +2196,9 @@ export class GameScene extends Phaser.Scene {
     if (this.isMobile) {
       this.waveText.setPosition(10, 8);
       this.hpText.setPosition(w / 2, 8).setOrigin(0.5, 0);
-      this.scoreText.setPosition(w - 10, 8).setOrigin(1, 0);
+      this.scoreText.setPosition(w - 60, 8).setOrigin(1, 0);
       this.streakText.setPosition(10, 26);
+      if (this.menuBtn) this.menuBtn.setPosition(w - 10, 6);
     } else {
       this.hpText.setPosition(w / 2 - 80, 12);
       this.nameText.setPosition(w - 220, 12);
@@ -2421,11 +2433,13 @@ export class GameScene extends Phaser.Scene {
       this.pauseContainer.setVisible(false);
       this.quitConfirmContainer.setVisible(false);
       if (this.practicePanel) this.practicePanel.setVisible(true);
+      if (this.menuBtn) this.menuBtn.setVisible(true);
     } else {
       this.prevState = this.state;
       this.state = 'paused';
       this.pauseContainer.setVisible(true);
       if (this.practicePanel) this.practicePanel.setVisible(false);
+      if (this.menuBtn) this.menuBtn.setVisible(false);
     }
   }
 

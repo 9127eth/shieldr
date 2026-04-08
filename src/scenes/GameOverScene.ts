@@ -52,7 +52,27 @@ export class GameOverScene extends Phaser.Scene {
     const isNewBest = this.score >= bestScore && this.score > 0 && this.mode === 'competitive';
 
     // -- Title --
-    let yPos = m ? Math.max(30, this.scale.height * 0.08) : this.cy - 220;
+    // On mobile, pre-estimate total content height so we can vertically center it.
+    let yPos: number;
+    if (m) {
+      const subLineCount = playerTitle ? 3 : 2;
+      const subH = subLineCount * 16;   // ~12px font at ~1.3 line-height
+      const newBestH = isNewBest ? 22 : 0;
+      const statsH = hasStats ? (12 + 18 + 3 * 17) : 0;
+      const totalH = 34         // title
+        + 48                    // gap to score
+        + 22                    // score
+        + 30                    // gap to sub-stats
+        + subH + 6              // sub-stats + gap
+        + newBestH              // optional new-best row
+        + 5                     // divider
+        + statsH                // run stats block
+        + 14                    // gap to buttons
+        + 25 + 36 + 25;         // two buttons + gap
+      yPos = Math.max(16, this.cy - totalH / 2);
+    } else {
+      yPos = this.cy - 220;
+    }
 
     const title = this.add.text(this.cx, yPos, 'THE CORE HAS FALLEN', {
       fontSize: m ? '28px' : '42px',
