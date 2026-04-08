@@ -335,7 +335,6 @@ export class GameScene extends Phaser.Scene {
       this.updateOrbs(delta);
       this.updateItemBox(delta);
       this.updateGravityFields(delta);
-      this.updateTelegraphs(delta);
       this.updateRoulette(delta);
       this.checkWaveComplete();
     } else if (this.state === 'waveClear') {
@@ -508,8 +507,11 @@ export class GameScene extends Phaser.Scene {
         const b = this.fields[j];
         const overlapFrac = this.computeLineOverlap(a, b);
         if (overlapFrac > INTERFERENCE_OVERLAP_THRESHOLD) {
-          a.decayMultiplier += 0.5;
-          b.decayMultiplier += 0.5;
+          const waveScale = 1 + Math.min(this.currentWave * 0.03, 1.5);
+          const sizeScale = 1 + this.widthStacks * 0.15;
+          const decay = 0.8 * waveScale * sizeScale;
+          a.decayMultiplier += decay;
+          b.decayMultiplier += decay;
         }
       }
     }
@@ -779,7 +781,7 @@ export class GameScene extends Phaser.Scene {
       if (e.type === 'phaser') {
         const wasPhaserVisible = e.phaserVisible;
         e.phaserTimer += delta;
-        const cycle = 1600;
+        const cycle = 2200;
         const phase = e.phaserTimer % cycle;
         e.phaserVisible = phase < 800;
         const drawAlpha = e.phaserVisible ? 1 : 0.1;
@@ -801,10 +803,15 @@ export class GameScene extends Phaser.Scene {
           e.carrierStaggerTimer -= delta;
         } else {
           e.carrierSpawnCd -= delta;
-          if (e.carrierSpawnCd <= 0 && e.carrierDronesSpawned < 8) {
+          if (e.carrierSpawnCd <= 0) {
             const spawnCount = Phaser.Math.Between(1, 2);
-            for (let s = 0; s < spawnCount && e.carrierDronesSpawned < 8; s++) {
-              this.spawnEnemyAt('drone', e.x + Phaser.Math.Between(-10, 10), e.y + Phaser.Math.Between(-10, 10));
+            for (let s = 0; s < spawnCount; s++) {
+              const angle = Math.random() * Math.PI * 2;
+              const dist = 50 + Math.random() * 60;
+              const drone = this.spawnEnemyAt('drone', e.x + Math.cos(angle) * dist, e.y + Math.sin(angle) * dist);
+              drone.scatterAngle = angle;
+              drone.scatterDuration = 1200 + Math.random() * 600;
+              drone.scatterTimer = drone.scatterDuration;
               e.carrierDronesSpawned++;
             }
             e.carrierSpawnCd = 3000;
@@ -855,8 +862,8 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
 
-      // Mini-drone scatter phase: eject sideways along the shield, then curve to core
-      if (e.type === 'miniDrone' && e.scatterTimer > 0) {
+      // Scatter phase: eject outward then curve to core (used by mini-drones and carrier-spawned drones)
+      if ((e.type === 'miniDrone' || e.type === 'drone') && e.scatterTimer > 0) {
         e.scatterTimer = Math.max(0, e.scatterTimer - delta);
         const t = e.scatterTimer / e.scatterDuration;
         const blend = 1 - t * t;
@@ -974,26 +981,21 @@ export class GameScene extends Phaser.Scene {
   /* ===== SPLITTER LOGIC ===== */
 
   private handleSplitterDestroy(e: Enemy, distFromCore: number, ff: ForceField) {
-    const maxDist = Math.max(this.scale.width, this.scale.height) / 2;
-    const outerThreshold = maxDist * 0.4;
+    const shieldAngle = Math.atan2(ff.y2 - ff.y1, ff.x2 - ff.x1);
+    const count = Phaser.Math.Between(2, 3);
+    for (let s = 0; s < count; s++) {
+      const side = s % 2 === 0 ? 1 : -1;
+      const jitter = (Math.random() - 0.5) * 0.8;
+      const ejectAngle = shieldAngle + (side > 0 ? 0 : Math.PI) + jitter;
 
-    if (distFromCore > outerThreshold) {
-      const shieldAngle = Math.atan2(ff.y2 - ff.y1, ff.x2 - ff.x1);
-      const count = Phaser.Math.Between(2, 3);
-      for (let s = 0; s < count; s++) {
-        const side = s % 2 === 0 ? 1 : -1;
-        const jitter = (Math.random() - 0.5) * 0.4;
-        const ejectAngle = shieldAngle + (side > 0 ? 0 : Math.PI) + jitter;
-
-        const spreadDist = 30 + Math.random() * 20;
-        const sx = e.x + Math.cos(ejectAngle) * spreadDist;
-        const sy = e.y + Math.sin(ejectAngle) * spreadDist;
-        const drone = this.spawnEnemyAt('miniDrone', sx, sy, DRONE_SPEED * 1.5);
-        drone.scatterAngle = ejectAngle;
-        drone.scatterDuration = 600 + Math.random() * 200;
-        drone.scatterTimer = drone.scatterDuration;
-        drone.immuneField = ff;
-      }
+      const spreadDist = 60 + Math.random() * 50;
+      const sx = e.x + Math.cos(ejectAngle) * spreadDist;
+      const sy = e.y + Math.sin(ejectAngle) * spreadDist;
+      const drone = this.spawnEnemyAt('miniDrone', sx, sy, DRONE_SPEED * 1.5);
+      drone.scatterAngle = ejectAngle;
+      drone.scatterDuration = 600 + Math.random() * 200;
+      drone.scatterTimer = drone.scatterDuration;
+      drone.immuneField = ff;
     }
   }
 
@@ -1335,11 +1337,7 @@ export class GameScene extends Phaser.Scene {
     else if (w <= 15) this.spawnInterval = 350;
     else this.spawnInterval = Math.max(200, 350 - (w - 15) * 10);
 
-    // Spawn telegraphs
-    this.showSpawnTelegraphs();
-
     this.spawnTimer = w <= 5 ? 1200 : (w <= 10 ? 750 : 500);
-    this.telegraphPhase = true;
     this.state = 'playing';
 
     // Check title progression
