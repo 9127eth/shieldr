@@ -2179,8 +2179,9 @@ export class GameScene extends Phaser.Scene {
       this.bestText.setVisible(false);
 
       this.menuBtn = this.add.text(0, 0, '☰', {
-        fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
-      }).setOrigin(1, 0).setDepth(95).setInteractive();
+        fontSize: '26px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#8899aa',
+        padding: { x: 6, y: 4 },
+      }).setOrigin(1, 0.5).setDepth(95).setInteractive();
       this.menuBtn.on('pointerdown', () => {
         this.audio.playClick();
         this.togglePause();
@@ -2196,9 +2197,9 @@ export class GameScene extends Phaser.Scene {
     if (this.isMobile) {
       this.waveText.setPosition(10, 8);
       this.hpText.setPosition(w / 2, 8).setOrigin(0.5, 0);
-      this.scoreText.setPosition(w - 60, 8).setOrigin(1, 0);
+      this.scoreText.setPosition(w - 10, 8).setOrigin(1, 0);
       this.streakText.setPosition(10, 26);
-      if (this.menuBtn) this.menuBtn.setPosition(w - 10, 6);
+      if (this.menuBtn) this.menuBtn.setPosition(w - 8, 66);
     } else {
       this.hpText.setPosition(w / 2 - 80, 12);
       this.nameText.setPosition(w - 220, 12);

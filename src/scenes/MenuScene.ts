@@ -21,6 +21,9 @@ export class MenuScene extends Phaser.Scene {
   private aboutTotalH = 0;
   private aboutContentH = 0;
   private audio!: AudioManager;
+  private isMobile = false;
+  private aboutPanelW = 820;
+  private aboutPanelH = 780;
 
   private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
@@ -37,6 +40,7 @@ export class MenuScene extends Phaser.Scene {
     this.cy = this.scale.height / 2;
     this.audio = AudioManager.getInstance();
     this.audio.enabled = StorageManager.getVolume();
+    this.isMobile = !this.sys.game.device.os.desktop;
 
     this.generateStars();
     this.planetGfx = this.add.graphics();
@@ -112,14 +116,23 @@ export class MenuScene extends Phaser.Scene {
 
     this.input.on('wheel', (_p: any, _gos: any, _dx: number, dy: number) => {
       if (this.showingAbout) {
-        const maxScroll = Math.max(0, this.aboutTotalH - this.aboutContentH);
-        this.aboutScrollY = Phaser.Math.Clamp(this.aboutScrollY + dy * 0.5, 0, maxScroll);
-        this.aboutContent.setY(-this.aboutScrollY);
-        const panelW = 820, panelH = 780;
-        const contentTop = -panelH / 2 + 65;
-        this.drawAboutScrollbar(panelW, panelH, contentTop, this.aboutContentH);
+        this.scrollAbout(dy * 0.5);
       }
     });
+
+    if (this.isMobile) {
+      let aboutDragY: number | null = null;
+      this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+        if (this.showingAbout) aboutDragY = p.y;
+      });
+      this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+        if (!this.showingAbout || aboutDragY === null) return;
+        const dy = aboutDragY - p.y;
+        aboutDragY = p.y;
+        this.scrollAbout(dy);
+      });
+      this.input.on('pointerup', () => { aboutDragY = null; });
+    }
 
     this.scale.on('resize', (gs: Phaser.Structs.Size) => {
       this.cx = gs.width / 2;
@@ -149,12 +162,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateAboutMask() {
-    const panelW = 820;
-    const panelH = 780;
-    const contentX = -panelW / 2 + 36;
-    const contentTop = -panelH / 2 + 65;
-    const contentW = panelW - 72;
-    const contentH = panelH - 110;
+    const panelW = this.aboutPanelW;
+    const panelH = this.aboutPanelH;
+    const m = this.isMobile;
+    const pad = m ? 16 : 36;
+    const contentX = -panelW / 2 + pad;
+    const contentTop = -panelH / 2 + (m ? 52 : 65);
+    const contentW = panelW - pad * 2;
+    const contentH = panelH - (m ? 80 : 110);
 
     this.aboutBackdrop.setPosition(this.cx, this.cy);
     if (this.showingAbout) {
@@ -245,38 +260,59 @@ export class MenuScene extends Phaser.Scene {
   /* ===== LEADERBOARD ===== */
 
   private buildLeaderboard() {
+    const m = this.isMobile;
+    const sw = this.scale.width;
+    const sh = this.scale.height;
+    const panelW = m ? Math.min(sw - 24, 360) : 500;
+    const panelH = m ? Math.min(sh - 40, 360) : 400;
+
     this.leaderboardContainer = this.add.container(this.cx, this.cy).setDepth(50).setVisible(false);
 
-    const bg = this.add.rectangle(0, 0, 500, 400, 0x0a0a1a, 0.95).setStrokeStyle(2, 0x335577);
+    const bg = this.add.rectangle(0, 0, panelW, panelH, 0x0a0a1a, 0.95).setStrokeStyle(2, 0x335577);
     this.leaderboardContainer.add(bg);
 
-    const title = this.add.text(0, -170, 'LEADERBOARD', {
-      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+    const title = this.add.text(0, -panelH / 2 + 20, 'LEADERBOARD', {
+      fontSize: m ? '18px' : '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#4af', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.leaderboardContainer.add(title);
 
-    const header = this.add.text(-220, -130, 'RANK   NAME             RANK        WAVE   SCORE', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#556677',
-    });
-    this.leaderboardContainer.add(header);
+    const colX = -panelW / 2 + 18;
+    if (!m) {
+      const header = this.add.text(colX, -panelH / 2 + 50, 'RANK   NAME             RANK        WAVE   SCORE', {
+        fontSize: '11px', fontFamily: 'monospace', color: '#556677',
+      });
+      this.leaderboardContainer.add(header);
+    }
 
     const entries = StorageManager.getLeaderboard().slice(0, 10);
+    const rowStart = m ? -panelH / 2 + 50 : -panelH / 2 + 70;
+    const rowGap = m ? 22 : 26;
+
     entries.forEach((e, i) => {
       const rank = String(i + 1).padStart(2, ' ');
-      const name = e.name.padEnd(16, ' ');
-      const titleStr = (e.title || '').padEnd(10, ' ');
-      const wave = String(e.wave).padStart(4, ' ');
-      const score = String(e.score).padStart(7, ' ');
-      const row = this.add.text(-220, -100 + i * 26, `${rank}     ${name} ${titleStr} ${wave}   ${score}`, {
-        fontSize: '13px', fontFamily: 'monospace',
+      let rowStr: string;
+      if (m) {
+        const name = e.name.substring(0, 12).padEnd(12, ' ');
+        const wave = String(e.wave).padStart(3, ' ');
+        const score = String(e.score).padStart(6, ' ');
+        rowStr = `${rank}  ${name} W${wave} ${score}`;
+      } else {
+        const name = e.name.padEnd(16, ' ');
+        const titleStr = (e.title || '').padEnd(10, ' ');
+        const wave = String(e.wave).padStart(4, ' ');
+        const score = String(e.score).padStart(7, ' ');
+        rowStr = `${rank}     ${name} ${titleStr} ${wave}   ${score}`;
+      }
+      const row = this.add.text(colX, rowStart + i * rowGap, rowStr, {
+        fontSize: m ? '11px' : '13px', fontFamily: 'monospace',
         color: i === 0 ? '#ffcc44' : i < 3 ? '#44aaff' : '#8899aa',
       });
       this.leaderboardContainer.add(row);
     });
 
-    const closeBtn = this.add.text(0, 170, '[ CLOSE ]', {
-      fontSize: '14px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
+    const closeBtn = this.add.text(0, panelH / 2 - 20, '[ CLOSE ]', {
+      fontSize: m ? '13px' : '14px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     closeBtn.on('pointerover', () => closeBtn.setColor('#ffffff'));
     closeBtn.on('pointerout', () => closeBtn.setColor('#556677'));
@@ -298,12 +334,17 @@ export class MenuScene extends Phaser.Scene {
   /* ===== ABOUT / HOW TO PLAY ===== */
 
   private buildAbout() {
-    const panelW = 820;
-    const panelH = 780;
+    const m = this.isMobile;
+    const sw = this.scale.width;
+    const sh = this.scale.height;
+    const panelW = m ? Math.min(sw - 16, 500) : 820;
+    const panelH = m ? Math.min(sh - 16, 700) : 780;
+    this.aboutPanelW = panelW;
+    this.aboutPanelH = panelH;
 
     this.aboutBackdrop = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.5)
       .setDepth(59).setVisible(false).setInteractive();
-    this.aboutBackdrop.on('pointerdown', () => this.toggleAbout());
+    if (!m) this.aboutBackdrop.on('pointerdown', () => this.toggleAbout());
 
     this.aboutContainer = this.add.container(this.cx, this.cy).setDepth(60).setVisible(false);
 
@@ -311,23 +352,25 @@ export class MenuScene extends Phaser.Scene {
     this.aboutContainer.add(bg);
 
     const panelTitle = this.add.text(0, -panelH / 2 + 28, 'HOW TO PLAY', {
-      fontSize: '28px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      fontSize: m ? '20px' : '28px', fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#44aaff', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.aboutContainer.add(panelTitle);
 
-    const xBtn = this.add.text(panelW / 2 - 32, -panelH / 2 + 24, '✕', {
-      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
+    const xBtn = this.add.text(panelW / 2 - (m ? 20 : 32), -panelH / 2 + 24, '✕', {
+      fontSize: m ? '20px' : '22px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
+      padding: m ? { x: 8, y: 4 } : undefined,
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     xBtn.on('pointerover', () => xBtn.setColor('#ff6666'));
     xBtn.on('pointerout', () => xBtn.setColor('#556677'));
     xBtn.on('pointerdown', () => this.toggleAbout());
     this.aboutContainer.add(xBtn);
 
-    const contentX = -panelW / 2 + 36;
-    const contentTop = -panelH / 2 + 65;
-    const contentW = panelW - 72;
-    const contentH = panelH - 110;
+    const pad = m ? 16 : 36;
+    const contentX = -panelW / 2 + pad;
+    const contentTop = -panelH / 2 + (m ? 52 : 65);
+    const contentW = panelW - pad * 2;
+    const contentH = panelH - (m ? 80 : 110);
     this.aboutContentH = contentH;
 
     this.aboutMaskGfx = this.make.graphics({});
@@ -342,12 +385,11 @@ export class MenuScene extends Phaser.Scene {
     const h = this.addAboutText(contentX, contentTop, contentW);
     this.aboutTotalH = h;
 
-    // Scrollbar track + thumb
     this.aboutScrollbar = this.add.graphics().setDepth(61).setVisible(false);
     this.drawAboutScrollbar(panelW, panelH, contentTop, contentH);
 
     const closeBtn = this.add.text(0, panelH / 2 - 20, '[ CLOSE ]', {
-      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
+      fontSize: m ? '14px' : '18px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     closeBtn.on('pointerover', () => closeBtn.setColor('#ffffff'));
     closeBtn.on('pointerout', () => closeBtn.setColor('#556677'));
@@ -379,36 +421,39 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private addAboutText(x: number, startY: number, maxW: number): number {
+    const m = this.isMobile;
+
     const hdr = (txt: string, y: number, color = '#44aaff') => {
       const t = this.add.text(x, y, txt, {
-        fontSize: '20px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        fontSize: m ? '15px' : '20px', fontFamily: '"Segoe UI", system-ui, sans-serif',
         color, fontStyle: 'bold',
       }).setWordWrapWidth(maxW);
       this.aboutContent.add(t);
-      return t.height + 8;
+      return t.height + (m ? 5 : 8);
     };
 
     const body = (txt: string, y: number, color = '#8899aa') => {
       const t = this.add.text(x, y, txt, {
-        fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-        color, lineSpacing: 6,
+        fontSize: m ? '12px' : '16px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color, lineSpacing: m ? 3 : 6,
       }).setWordWrapWidth(maxW);
       this.aboutContent.add(t);
-      return t.height + 10;
+      return t.height + (m ? 6 : 10);
     };
 
     const item = (name: string, color: string, desc: string, y: number) => {
       const nameText = this.add.text(x, y, `● ${name}`, {
-        fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        fontSize: m ? '13px' : '16px', fontFamily: '"Segoe UI", system-ui, sans-serif',
         color, fontStyle: 'bold',
       });
       this.aboutContent.add(nameText);
-      const descText = this.add.text(x + 14, y + 22, desc, {
-        fontSize: '14px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-        color: '#778899', lineSpacing: 4,
-      }).setWordWrapWidth(maxW - 14);
+      const indent = m ? 10 : 14;
+      const descText = this.add.text(x + indent, y + (m ? 18 : 22), desc, {
+        fontSize: m ? '11px' : '14px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#778899', lineSpacing: m ? 2 : 4,
+      }).setWordWrapWidth(maxW - indent);
       this.aboutContent.add(descText);
-      return 22 + descText.height + 8;
+      return (m ? 18 : 22) + descText.height + (m ? 5 : 8);
     };
 
     let y = startY;
@@ -565,6 +610,14 @@ export class MenuScene extends Phaser.Scene {
     return y - startY;
   }
 
+  private scrollAbout(dy: number) {
+    const maxScroll = Math.max(0, this.aboutTotalH - this.aboutContentH);
+    this.aboutScrollY = Phaser.Math.Clamp(this.aboutScrollY + dy, 0, maxScroll);
+    this.aboutContent.setY(-this.aboutScrollY);
+    const contentTop = -this.aboutPanelH / 2 + (this.isMobile ? 52 : 65);
+    this.drawAboutScrollbar(this.aboutPanelW, this.aboutPanelH, contentTop, this.aboutContentH);
+  }
+
   private toggleAbout() {
     this.showingAbout = !this.showingAbout;
     if (this.showingAbout) {
@@ -574,8 +627,8 @@ export class MenuScene extends Phaser.Scene {
       this.aboutContainer.setVisible(true);
       this.aboutContainer.setPosition(this.cx, this.cy);
       this.aboutScrollbar.setVisible(true);
-      const panelW = 820, panelH = 780;
-      const contentTop = -panelH / 2 + 65;
+      const panelW = this.aboutPanelW, panelH = this.aboutPanelH;
+      const contentTop = -panelH / 2 + (this.isMobile ? 52 : 65);
       this.drawAboutScrollbar(panelW, panelH, contentTop, this.aboutContentH);
     } else {
       this.aboutBackdrop.setVisible(false);
