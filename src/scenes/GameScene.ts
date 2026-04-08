@@ -80,7 +80,7 @@ interface ItemBox {
   age: number;
 }
 
-type ItemType = 'gravityField' | 'timeBender' | 'healthSurge' | 'starBomb' | 'timeFreeze' | 'sanctuary' | 'cardinalRift';
+type ItemType = 'gravityField' | 'timeBender' | 'healthSurge' | 'starBomb' | 'timeFreeze' | 'starShield' | 'cardinalRift';
 
 interface QueueSlot {
   item: ItemType | null;
@@ -113,7 +113,7 @@ const ITEM_COLORS: Record<ItemType, number> = {
   healthSurge: 0xff4444,
   starBomb: 0xffdd44,
   timeFreeze: 0xaa44ff,
-  sanctuary: 0xffcc44,
+  starShield: 0xffcc44,
   cardinalRift: 0xff44ff,
 };
 
@@ -123,7 +123,7 @@ const ITEM_LABELS: Record<ItemType, string> = {
   healthSurge: 'HEALTH SURGE',
   starBomb: 'STAR BOMB',
   timeFreeze: 'TIME FREEZE',
-  sanctuary: 'SANCTUARY',
+  starShield: 'STAR SHIELD',
   cardinalRift: 'CARDINAL RIFT',
 };
 
@@ -132,7 +132,7 @@ const ITEM_LABELS: Record<ItemType, string> = {
 export class GameScene extends Phaser.Scene {
   private cx = 0;
   private cy = 0;
-  private mode: 'normal' | 'practice' = 'normal';
+  private mode: 'competitive' | 'practice' = 'competitive';
 
   private coreHP = 100;
   private maxHP = 100;
@@ -183,7 +183,7 @@ export class GameScene extends Phaser.Scene {
   // Active effects
   private timeBenderTimer = 0;
   private timeFreezeTimer = 0;
-  private sanctuaryTimer = 0;
+  private starShieldTimer = 0;
   private gravityFields: { x: number; y: number; timer: number; gfx: Phaser.GameObjects.Graphics }[] = [];
 
   // Spawn telegraphs
@@ -215,11 +215,14 @@ export class GameScene extends Phaser.Scene {
   private audio!: AudioManager;
   private planetAngle = 0;
   private stars: { x: number; y: number; s: number; a: number }[] = [];
+  private practicePanel: Phaser.GameObjects.Container | null = null;
+  private practicePanelBounds = { x: 0, y: 0, w: 0, h: 0 };
+  private practicePanelExpanded = true;
 
   constructor() { super('GameScene'); }
 
   init(data: any) {
-    this.mode = data?.mode || 'normal';
+    this.mode = data?.mode || 'competitive';
     this.coreHP = 100;
     this.score = 0;
     this.currentWave = 0;
@@ -250,12 +253,14 @@ export class GameScene extends Phaser.Scene {
     this.itemTutorialText = null;
     this.timeBenderTimer = 0;
     this.timeFreezeTimer = 0;
-    this.sanctuaryTimer = 0;
+    this.starShieldTimer = 0;
     this.gravityFields = [];
     this.telegraphs = [];
     this.telegraphPhase = false;
     this.showingLB = false;
     this.tooltip = null;
+    this.practicePanel = null;
+    this.practicePanelExpanded = true;
     this.midWaveOrbRoll = false;
     this.orbSpawnCount = 0;
     this.runStats = createRunStats();
@@ -301,9 +306,14 @@ export class GameScene extends Phaser.Scene {
     this.scale.on('resize', (gs: Phaser.Structs.Size) => {
       this.cx = gs.width / 2;
       this.cy = gs.height / 2;
+      this.repositionPracticePanel();
     });
 
     this.startNextWave();
+
+    if (this.mode === 'practice') {
+      this.createPracticeSpawnPanel();
+    }
   }
 
   update(_time: number, delta: number) {
@@ -346,6 +356,7 @@ export class GameScene extends Phaser.Scene {
   private onPointerDown(p: Phaser.Input.Pointer) {
     if (this.state === 'paused') return;
     if (this.state === 'gameOver') return;
+    if (this.practicePanel && this.isInPracticePanel(p.x, p.y)) return;
 
     if (p.rightButtonDown()) {
       this.useItem(p.x, p.y);
@@ -908,7 +919,7 @@ export class GameScene extends Phaser.Scene {
 
   private enemyHitCore(e: Enemy, idx: number) {
     if (this.mode !== 'practice') {
-      if (this.sanctuaryTimer > 0) {
+      if (this.starShieldTimer > 0) {
         this.score += e.points;
         this.totalEnemiesDestroyed++;
         this.spawnExplosion(e.x, e.y, 0xffcc44);
@@ -1054,8 +1065,8 @@ export class GameScene extends Phaser.Scene {
         const distCore = Phaser.Math.Distance.Between(p.x, p.y, this.cx, this.cy);
         if (distCore < PLANET_R) {
           if (this.mode !== 'practice') {
-            if (this.sanctuaryTimer > 0) {
-              // Sanctuary: absorb without damage
+            if (this.starShieldTimer > 0) {
+              // Star Shield: absorb without damage
             } else {
               this.coreHP = Math.max(0, this.coreHP - p.damage);
               this.perfectWave = false;
@@ -1063,7 +1074,7 @@ export class GameScene extends Phaser.Scene {
               this.streakDurationBonus = 0;
             }
           }
-          if (this.mode === 'practice' || this.sanctuaryTimer <= 0) {
+          if (this.mode === 'practice' || this.starShieldTimer <= 0) {
             this.coreHitEffect();
           }
           p.gfx.destroy();
@@ -1215,45 +1226,45 @@ export class GameScene extends Phaser.Scene {
     let droneMul: number, rocketMul: number, shooterMul: number;
     let dmgBonus: number, shooterFireRate: number, shooterRange: number;
 
-    if (w <= 3) {
-      droneMul = 1; rocketMul = 1; shooterMul = 1; dmgBonus = 0;
-      shooterFireRate = 2000; shooterRange = 250;
-    } else if (w <= 6) {
-      droneMul = 1 + (w - 3) * 0.1;
-      rocketMul = 1; shooterMul = 1; dmgBonus = 0;
-      shooterFireRate = 2000; shooterRange = 250;
-    } else if (w <= 10) {
-      droneMul = 1.3 + (w - 6) * 0.1;
-      rocketMul = 1; shooterMul = 1; dmgBonus = 0;
+    if (w <= 2) {
+      droneMul = 1.15; rocketMul = 1.1; shooterMul = 1; dmgBonus = 0;
       shooterFireRate = 1800; shooterRange = 240;
-    } else if (w <= 15) {
-      droneMul = 1.7 + (w - 10) * 0.06;
-      rocketMul = 1.1; shooterMul = 1.1; dmgBonus = 0;
-      shooterFireRate = 1500; shooterRange = 220;
-    } else if (w <= 20) {
-      droneMul = 2.0;
-      rocketMul = 1.3; shooterMul = 1.3; dmgBonus = 0;
+    } else if (w <= 4) {
+      droneMul = 1.3 + (w - 2) * 0.1;
+      rocketMul = 1.15; shooterMul = 1.1; dmgBonus = 0;
+      shooterFireRate = 1600; shooterRange = 230;
+    } else if (w <= 7) {
+      droneMul = 1.5 + (w - 4) * 0.1;
+      rocketMul = 1.2; shooterMul = 1.2; dmgBonus = 0;
+      shooterFireRate = 1400; shooterRange = 220;
+    } else if (w <= 10) {
+      droneMul = 1.8 + (w - 7) * 0.07;
+      rocketMul = 1.3; shooterMul = 1.3; dmgBonus = Math.floor((w - 7) * 0.5);
       shooterFireRate = 1200; shooterRange = 200;
+    } else if (w <= 15) {
+      droneMul = 2.0 + (w - 10) * 0.06;
+      rocketMul = 1.4; shooterMul = 1.4; dmgBonus = 2 + (w - 10);
+      shooterFireRate = 1000; shooterRange = 180;
     } else {
-      const ex = w - 20;
-      droneMul = 2.0 + ex * 0.05;
-      rocketMul = 1.3 + ex * 0.05;
-      shooterMul = 1.3 + ex * 0.05;
-      dmgBonus = ex;
-      shooterFireRate = Math.max(600, 1200 - ex * 30);
-      shooterRange = Math.max(150, 200 - ex * 3);
+      const ex = w - 15;
+      droneMul = 2.3 + ex * 0.06;
+      rocketMul = 1.4 + ex * 0.05;
+      shooterMul = 1.4 + ex * 0.05;
+      dmgBonus = 7 + ex;
+      shooterFireRate = Math.max(600, 1000 - ex * 30);
+      shooterRange = Math.max(150, 180 - ex * 3);
     }
     return { droneMul, rocketMul, shooterMul, dmgBonus, shooterFireRate, shooterRange };
   }
 
   private getWaveEnemyCount(): number {
     const w = this.currentWave;
-    if (w <= 3) return 3 + 2 * (w - 1);
-    if (w <= 6) return 6 + 2 * (w - 3);
-    if (w <= 10) return 10 + 2 * (w - 6);
-    if (w <= 15) return 16 + 2 * (w - 10);
-    if (w <= 20) return 23 + 3 * (w - 15);
-    return 40 + 3 * (w - 20);
+    if (w <= 2) return 4 + 3 * (w - 1);
+    if (w <= 4) return 10 + 3 * (w - 2);
+    if (w <= 7) return 16 + 3 * (w - 4);
+    if (w <= 10) return 25 + 3 * (w - 7);
+    if (w <= 15) return 34 + 3 * (w - 10);
+    return 49 + 3 * (w - 15);
   }
 
   private getWaveTypes(): string[] {
@@ -1261,11 +1272,11 @@ export class GameScene extends Phaser.Scene {
     const types: string[] = [];
 
     types.push('drone');
-    if (w >= 4) types.push('rocket');
-    if (w >= 7) types.push('shooter');
-    if (w >= 9) types.push('splitter');
-    if (w >= 12) types.push('phaser');
-    if (w >= 14) types.push('shieldBreaker');
+    if (w >= 2) types.push('rocket');
+    if (w >= 4) types.push('shooter');
+    if (w >= 5) types.push('splitter');
+    if (w >= 7) types.push('phaser');
+    if (w >= 9) types.push('shieldBreaker');
 
     return types;
   }
@@ -1281,17 +1292,17 @@ export class GameScene extends Phaser.Scene {
         q.push('drone');
       } else {
         const r = Math.random();
-        if (w < 7) {
-          q.push(r < 0.6 ? 'drone' : 'rocket');
-        } else if (w < 9) {
+        if (w < 4) {
+          q.push(r < 0.55 ? 'drone' : 'rocket');
+        } else if (w < 5) {
           q.push(r < 0.4 ? 'drone' : r < 0.7 ? 'rocket' : 'shooter');
-        } else if (w < 12) {
-          q.push(r < 0.35 ? 'drone' : r < 0.55 ? 'rocket' : r < 0.75 ? 'shooter' : 'splitter');
-        } else if (w < 14) {
-          q.push(r < 0.3 ? 'drone' : r < 0.48 ? 'rocket' : r < 0.65 ? 'shooter' : r < 0.8 ? 'splitter' : 'phaser');
+        } else if (w < 7) {
+          q.push(r < 0.3 ? 'drone' : r < 0.52 ? 'rocket' : r < 0.75 ? 'shooter' : 'splitter');
+        } else if (w < 9) {
+          q.push(r < 0.25 ? 'drone' : r < 0.43 ? 'rocket' : r < 0.6 ? 'shooter' : r < 0.78 ? 'splitter' : 'phaser');
         } else {
-          q.push(r < 0.25 ? 'drone' : r < 0.42 ? 'rocket' : r < 0.57 ? 'shooter'
-            : r < 0.72 ? 'splitter' : r < 0.86 ? 'phaser' : 'shieldBreaker');
+          q.push(r < 0.2 ? 'drone' : r < 0.36 ? 'rocket' : r < 0.52 ? 'shooter'
+            : r < 0.68 ? 'splitter' : r < 0.84 ? 'phaser' : 'shieldBreaker');
         }
       }
     }
@@ -1310,24 +1321,24 @@ export class GameScene extends Phaser.Scene {
     this.midWaveOrbRoll = false;
     this.spawnQ = this.buildSpawnQueue();
 
-    // Mini-boss spawning
-    if (this.currentWave % 10 === 0) {
-      if (this.currentWave >= 10) this.spawnQ.push('carrier');
-      if (this.currentWave >= 20) this.spawnQ.push('siege');
+    // Mini-boss spawning every 7 waves, carrier at 7+, siege at 14+
+    if (this.currentWave % 7 === 0) {
+      if (this.currentWave >= 7) this.spawnQ.push('carrier');
+      if (this.currentWave >= 14) this.spawnQ.push('siege');
     }
 
     const w = this.currentWave;
-    if (w <= 3) this.spawnInterval = 1200;
-    else if (w <= 6) this.spawnInterval = 1000;
-    else if (w <= 10) this.spawnInterval = 800;
-    else if (w <= 15) this.spawnInterval = 600;
-    else if (w <= 20) this.spawnInterval = 400;
-    else this.spawnInterval = Math.max(200, 400 - (w - 20) * 10);
+    if (w <= 2) this.spawnInterval = 1000;
+    else if (w <= 4) this.spawnInterval = 800;
+    else if (w <= 7) this.spawnInterval = 650;
+    else if (w <= 10) this.spawnInterval = 500;
+    else if (w <= 15) this.spawnInterval = 350;
+    else this.spawnInterval = Math.max(200, 350 - (w - 15) * 10);
 
     // Spawn telegraphs
     this.showSpawnTelegraphs();
 
-    this.spawnTimer = w <= 10 ? 1500 : (w <= 20 ? 750 : 750);
+    this.spawnTimer = w <= 5 ? 1200 : (w <= 10 ? 750 : 500);
     this.telegraphPhase = true;
     this.state = 'playing';
 
@@ -1346,11 +1357,11 @@ export class GameScene extends Phaser.Scene {
     if (this.spawnQ.length === 0) return;
     this.spawnTimer -= delta;
     if (this.spawnTimer <= 0) {
-      const groupSize = this.currentWave <= 6 ? 1
-        : this.currentWave <= 10 ? Phaser.Math.Between(1, 2)
-        : this.currentWave <= 15 ? Phaser.Math.Between(1, 3)
-        : this.currentWave <= 20 ? Phaser.Math.Between(2, 4)
-        : Phaser.Math.Between(2, 6);
+      const groupSize = this.currentWave <= 3 ? Phaser.Math.Between(1, 2)
+        : this.currentWave <= 5 ? Phaser.Math.Between(1, 3)
+        : this.currentWave <= 8 ? Phaser.Math.Between(2, 3)
+        : this.currentWave <= 12 ? Phaser.Math.Between(2, 4)
+        : Phaser.Math.Between(3, 6);
       const toSpawn = Math.min(groupSize, this.spawnQ.length);
       for (let i = 0; i < toSpawn; i++) {
         this.spawnEnemy(this.spawnQ.shift()!);
@@ -1371,7 +1382,8 @@ export class GameScene extends Phaser.Scene {
 
   private onWaveClear() {
     this.state = 'waveClear';
-    this.waveTimer = 3000;
+    const w = this.currentWave;
+    this.waveTimer = w <= 4 ? 1500 : (w <= 8 ? 2000 : 3000);
     this.audio.playWaveClear();
 
     const banner = this.add.text(this.cx, this.cy - 60, `WAVE ${this.currentWave} CLEAR`, {
@@ -1386,7 +1398,7 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => banner.destroy(),
     });
 
-    if (this.perfectWave && this.mode === 'normal') {
+    if (this.perfectWave && this.mode === 'competitive') {
       this.score += 200;
       this.perfectStreak++;
       this.longestPerfectStreak = Math.max(this.longestPerfectStreak, this.perfectStreak);
@@ -1730,14 +1742,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private rollWeightedItem(): ItemType {
-    const items: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'sanctuary', 'cardinalRift'];
+    const items: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'starShield', 'cardinalRift'];
     const weights: number[] = [10, 10, 10, 10, 10, 10, 10];
     const hpRatio = this.coreHP / this.maxHP;
 
     // Weight adjustments based on game state
     if (hpRatio < 0.3) {
       weights[2] += 15; // healthSurge
-      weights[5] += 10; // sanctuary
+      weights[5] += 10; // starShield
     }
     if (hpRatio > 0.8) {
       weights[2] = 2; // healthSurge rare when healthy
@@ -1775,7 +1787,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateRoulette(delta: number) {
-    const allItems: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'sanctuary', 'cardinalRift'];
+    const allItems: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'starShield', 'cardinalRift'];
 
     for (let si = 0; si < 2; si++) {
       const rs = this.rouletteSlots[si];
@@ -1870,7 +1882,7 @@ export class GameScene extends Phaser.Scene {
       case 'healthSurge': this.activateHealthSurge(); break;
       case 'starBomb': this.activateStarBomb(); break;
       case 'timeFreeze': this.activateTimeFreeze(); break;
-      case 'sanctuary': this.activateSanctuary(); break;
+      case 'starShield': this.activateStarShield(); break;
       case 'cardinalRift': this.activateCardinalRift(); break;
     }
   }
@@ -1988,9 +2000,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(100, 170, 100, 255, true);
   }
 
-  private activateSanctuary() {
+  private activateStarShield() {
     this.audio.playSanctuary();
-    this.sanctuaryTimer = 8000;
+    this.starShieldTimer = 8000;
   }
 
   private activateCardinalRift() {
@@ -2028,9 +2040,9 @@ export class GameScene extends Phaser.Scene {
   private updateActiveEffects(delta: number) {
     if (this.timeBenderTimer > 0) this.timeBenderTimer -= delta;
     if (this.timeFreezeTimer > 0) this.timeFreezeTimer -= delta;
-    if (this.sanctuaryTimer > 0) {
-      this.sanctuaryTimer -= delta;
-      if (this.sanctuaryTimer <= 0) {
+    if (this.starShieldTimer > 0) {
+      this.starShieldTimer -= delta;
+      if (this.starShieldTimer <= 0) {
         this.audio.playSanctuaryEnd();
       }
     }
@@ -2115,8 +2127,8 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(hpColor, 0.15);
     g.fillCircle(this.cx, this.cy, PLANET_R + 6);
 
-    // Sanctuary dome
-    if (this.sanctuaryTimer > 0) {
+    // Star Shield dome
+    if (this.starShieldTimer > 0) {
       const pulseAlpha = 0.2 + Math.sin(this.gameTime * 0.005) * 0.1;
       g.fillStyle(0xffcc44, pulseAlpha);
       g.fillCircle(this.cx, this.cy, PLANET_R + 16);
@@ -2124,7 +2136,7 @@ export class GameScene extends Phaser.Scene {
       g.strokeCircle(this.cx, this.cy, PLANET_R + 16);
 
       // Countdown ring
-      const ratio = this.sanctuaryTimer / 8000;
+      const ratio = this.starShieldTimer / 8000;
       g.lineStyle(3, 0xffcc44, 0.7);
       g.beginPath();
       g.arc(this.cx, this.cy, PLANET_R + 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
@@ -2175,9 +2187,9 @@ export class GameScene extends Phaser.Scene {
 
     const name = StorageManager.getGuardianName();
     const title = getTitleForWave(this.currentWave);
-    this.nameText.setText(title ? `${name} · ${title}` : name);
+    this.nameText.setText(title ? `${name} · Rank: ${title}` : name);
 
-    if (this.mode === 'normal') {
+    if (this.mode === 'competitive') {
       const best = StorageManager.getPersonalBest(name);
       this.bestText.setText(`BEST: ${best}`);
     } else {
@@ -2223,9 +2235,9 @@ export class GameScene extends Phaser.Scene {
       this.hudGfx.fillStyle(0xaa44ff, 0.3);
       this.hudGfx.fillRoundedRect(this.cx - 50, 58, 100 * (this.timeFreezeTimer / 2500), 4, 2);
     }
-    if (this.sanctuaryTimer > 0) {
+    if (this.starShieldTimer > 0) {
       this.hudGfx.fillStyle(0xffcc44, 0.3);
-      this.hudGfx.fillRoundedRect(this.cx - 50, 66, 100 * (this.sanctuaryTimer / 8000), 4, 2);
+      this.hudGfx.fillRoundedRect(this.cx - 50, 66, 100 * (this.starShieldTimer / 8000), 4, 2);
     }
   }
 
@@ -2271,7 +2283,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Roulette text positioning — always keep text aligned to its slot
-    const allItems: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'sanctuary', 'cardinalRift'];
+    const allItems: ItemType[] = ['gravityField', 'timeBender', 'healthSurge', 'starBomb', 'timeFreeze', 'starShield', 'cardinalRift'];
     for (let si = 0; si < 2; si++) {
       const rs = this.rouletteSlots[si];
 
@@ -2383,10 +2395,12 @@ export class GameScene extends Phaser.Scene {
       this.state = this.prevState;
       this.pauseContainer.setVisible(false);
       this.quitConfirmContainer.setVisible(false);
+      if (this.practicePanel) this.practicePanel.setVisible(true);
     } else {
       this.prevState = this.state;
       this.state = 'paused';
       this.pauseContainer.setVisible(true);
+      if (this.practicePanel) this.practicePanel.setVisible(false);
     }
   }
 
@@ -2436,6 +2450,111 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.lbContainer.setVisible(false);
     }
+  }
+
+  /* ===== PRACTICE MODE SPAWNER ===== */
+
+  private createPracticeSpawnPanel() {
+    const spawnTypes: { type: EnemyType; label: string; color: number }[] = [
+      { type: 'drone', label: 'DRONE', color: 0x44ff88 },
+      { type: 'rocket', label: 'ROCKET', color: 0xff6644 },
+      { type: 'shooter', label: 'SHOOTER', color: 0xaa44ff },
+      { type: 'splitter', label: 'SPLITTER', color: 0x44ff44 },
+      { type: 'phaser', label: 'PHASER', color: 0x44ffff },
+      { type: 'shieldBreaker', label: 'BREAKER', color: 0xff4444 },
+      { type: 'carrier', label: 'CARRIER', color: 0xff8833 },
+      { type: 'siege', label: 'SIEGE', color: 0x44ddcc },
+    ];
+
+    const panelW = 160;
+    const rowH = 30;
+    const headerH = 30;
+    const bodyH = spawnTypes.length * rowH + 6;
+
+    this.practicePanel = this.add.container(0, 0).setDepth(80);
+    this.practicePanelExpanded = true;
+
+    const headerBg = this.add.rectangle(panelW / 2, headerH / 2, panelW, headerH, 0x0a0a1a, 0.85)
+      .setStrokeStyle(1, 0x335577, 0.4)
+      .setInteractive({ useHandCursor: true });
+    this.practicePanel.add(headerBg);
+
+    const toggleText = this.add.text(10, headerH / 2, '▾ SPAWN ENEMY', {
+      fontSize: '15px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#8899aa',
+    }).setOrigin(0, 0.5);
+    this.practicePanel.add(toggleText);
+
+    const bodyContainer = this.add.container(0, headerH);
+
+    const bodyBg = this.add.rectangle(panelW / 2, bodyH / 2, panelW, bodyH, 0x0a0a1a, 0.85)
+      .setStrokeStyle(1, 0x335577, 0.4)
+      .setInteractive();
+    bodyContainer.add(bodyBg);
+
+    spawnTypes.forEach((entry, i) => {
+      const rowY = i * rowH + rowH / 2 + 3;
+
+      const icon = this.add.graphics();
+      this.drawEnemyShape(icon, entry.type, 7, 1);
+      icon.setPosition(20, rowY);
+      bodyContainer.add(icon);
+
+      const colorStr = '#' + entry.color.toString(16).padStart(6, '0');
+      const label = this.add.text(38, rowY, entry.label, {
+        fontSize: '12px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: colorStr,
+      }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+
+      label.on('pointerover', () => { label.setColor('#ffffff'); label.setScale(1.05); });
+      label.on('pointerout', () => { label.setColor(colorStr); label.setScale(1); });
+      label.on('pointerdown', () => {
+        this.spawnEnemy(entry.type);
+        this.audio.playClick();
+      });
+
+      bodyContainer.add(label);
+    });
+
+    this.practicePanel.add(bodyContainer);
+
+    headerBg.on('pointerdown', () => {
+      this.practicePanelExpanded = !this.practicePanelExpanded;
+      bodyContainer.setVisible(this.practicePanelExpanded);
+      toggleText.setText(this.practicePanelExpanded ? '▾ SPAWN ENEMY' : '▸ SPAWN ENEMY');
+      this.updatePracticePanelBounds();
+      this.audio.playClick();
+    });
+    headerBg.on('pointerover', () => toggleText.setColor('#ffffff'));
+    headerBg.on('pointerout', () => toggleText.setColor('#8899aa'));
+
+    this.repositionPracticePanel();
+  }
+
+  private repositionPracticePanel() {
+    if (!this.practicePanel) return;
+    const panelW = 160;
+    const panelX = this.scale.width - 220 - panelW - 8;
+    const panelY = 5;
+    this.practicePanel.setPosition(panelX, panelY);
+    this.updatePracticePanelBounds();
+  }
+
+  private updatePracticePanelBounds() {
+    if (!this.practicePanel) return;
+    const panelW = 160;
+    const headerH = 30;
+    const bodyH = 8 * 30 + 6;
+    const panelH = this.practicePanelExpanded ? headerH + bodyH : headerH;
+    this.practicePanelBounds = {
+      x: this.practicePanel.x, y: this.practicePanel.y,
+      w: panelW, h: panelH,
+    };
+  }
+
+  private isInPracticePanel(px: number, py: number): boolean {
+    const b = this.practicePanelBounds;
+    return px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
   }
 
   /* ===== GAME OVER ===== */

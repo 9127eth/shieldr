@@ -7,7 +7,7 @@ export class GameOverScene extends Phaser.Scene {
   private cy = 0;
   private score = 0;
   private wave = 0;
-  private mode = 'normal';
+  private mode = 'competitive';
   private runStats: RunStats | null = null;
   private totalEnemiesDestroyed = 0;
   private particles: { x: number; y: number; vx: number; vy: number; size: number; alpha: number; color: number }[] = [];
@@ -20,7 +20,7 @@ export class GameOverScene extends Phaser.Scene {
   init(data: any) {
     this.score = data?.score || 0;
     this.wave = data?.wave || 0;
-    this.mode = data?.mode || 'normal';
+    this.mode = data?.mode || 'competitive';
     this.runStats = data?.runStats || null;
     this.totalEnemiesDestroyed = data?.totalEnemiesDestroyed || 0;
   }
@@ -32,7 +32,7 @@ export class GameOverScene extends Phaser.Scene {
     const audio = AudioManager.getInstance();
     audio.playGameOver();
 
-    if (this.mode === 'normal') {
+    if (this.mode === 'competitive') {
       const name = StorageManager.getGuardianName();
       StorageManager.saveScore(name, this.wave, this.score);
       if (this.runStats) {
@@ -49,7 +49,7 @@ export class GameOverScene extends Phaser.Scene {
     const hasStats = !!this.runStats;
     const bestScore = StorageManager.getPersonalBest(StorageManager.getGuardianName());
     const playerTitle = StorageManager.getPlayerTitle(StorageManager.getGuardianName());
-    const isNewBest = this.score >= bestScore && this.score > 0 && this.mode === 'normal';
+    const isNewBest = this.score >= bestScore && this.score > 0 && this.mode === 'competitive';
 
     // -- Title --
     let yPos = this.cy - 220;
