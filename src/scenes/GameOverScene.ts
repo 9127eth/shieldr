@@ -72,7 +72,7 @@ export class GameOverScene extends Phaser.Scene {
       color: '#ccddee',
     }).setOrigin(0.5).setDepth(10);
 
-    yPos += m ? 24 : 32;
+    yPos += m ? 30 : 32;
 
     const subStats = [`WAVE REACHED: ${this.wave}`, `PERSONAL BEST: ${bestScore}`];
     if (playerTitle) subStats.push(`RANK: ${playerTitle}`);
