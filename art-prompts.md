@@ -4,6 +4,8 @@
 
 **Style:** Neon sci-fi vector art designed for compositing over a dark game canvas. Clean geometric shapes with vivid color glow and soft bloom. Think Geometry Wars meets synthwave — sharp silhouettes surrounded by luminous halos. Every sprite should feel like it's emitting light into a dark void.
 
+**Fidelity: High-resolution rasterized vector art — NOT pixel art.** Assets should have smooth anti-aliased edges, clean gradients, and soft glowing bloom effects. There should be no visible individual pixels, no dithering, and no chunky aliased edges. The look is crisp, smooth, and modern — closer to Adobe Illustrator renders with glow effects than retro 8-bit or 16-bit pixel art. When prompting an image generator, use terms like "vector art," "clean digital illustration," "smooth edges," "neon glow" — and explicitly exclude "pixel art," "8-bit," "16-bit," "retro," "pixelated" from your prompt or add them to your negative prompt.
+
 **Palette:** Neon cyan, electric blue, hot magenta, acid green, warm gold, and stark white as accent/glow colors. Enemies use warm-to-hostile colors (red, orange, green, magenta). Player elements use cool-to-protective colors (cyan, blue, white, gold).
 
 **Rendering rules for all prompts:**
@@ -13,6 +15,52 @@
 - No photorealism — stylized, geometric, vector-inspired shapes
 - Sprites should read clearly at small sizes (48–128px)
 - All animation frames should be on a single horizontal spritesheet strip where noted
+
+---
+
+## Image Generator Configuration
+
+The pixel dimensions listed per asset (e.g. 48x48, 128x128) are **final in-game sizes**, not what you request from the generator. AI image generators output at fixed canvas sizes that must be mapped and post-processed.
+
+### Generator Canvas Sizes
+
+| Final game size | Generate at | Generator request | Post-processing |
+|---|---|---|---|
+| ≤64x64 (e.g. 48x48 drone) | 1024x1024 | Square 1:1, subject centered with generous padding | Trim transparent padding → resize to 2x game size (96x96) → final resize to game size (48x48) |
+| 65–128px (e.g. 128x128 planet) | 1024x1024 | Square 1:1, subject fills ~60% of canvas | Trim → resize to 2x (256x256) → final resize (128x128) |
+| 129–256px (e.g. 256x256 starbomb) | 1024x1024 | Square 1:1, subject fills ~70–80% of canvas | Trim → resize to 2x (512x512) → final resize (256x256) |
+| Wide/rectangular (e.g. 160x24 shield) | 1536x1024 or 1024x1024 | Use landscape aspect ratio (3:2) if available; otherwise generate square with the subject stretched horizontally across center | Trim → resize preserving aspect ratio to 2x (320x48) → final (160x24) |
+| Spritesheet strips | 1536x1024 | Generate each frame as a **separate image** at square 1:1, then stitch into a horizontal strip during post-processing | Generate individual frames → trim each to identical bounding box → resize uniformly → stitch left-to-right into final strip |
+
+### Aspect Ratio Reference
+
+- **1:1 (square)** — Default for all circular, square, or nearly-square assets (planet, enemies, orbs, explosions, UI icons)
+- **3:2 or 16:9 (landscape)** — Shields, banners, HP bars, tooltip bubbles, any asset significantly wider than tall
+- **2:3 or 9:16 (portrait)** — Roulette spin column (48x120); generate tall or generate square and crop
+
+### Consistency Protocol
+
+To keep visual style uniform across all assets:
+
+1. **Same model + settings for each category.** Generate all enemies in one session, all shields in another, all orbs in another. Don't mix categories within a session.
+2. **Lock your generation parameters.** If using Stable Diffusion or ComfyUI: pick a checkpoint, sampler, CFG scale, and step count and reuse them for every asset. Document these values. If using DALL-E or Midjourney: use the same style reference / style-raw / `--sref` across all prompts.
+3. **Seed anchoring (where supported).** Generate one "hero" asset per category (e.g. the Drone for enemies). Save its seed. Use seed variations for the remaining assets in that category to maintain consistent line weight, glow radius, and color temperature.
+4. **Negative prompt (where supported).** Always include: `3D render, photorealistic, realistic lighting, drop shadow, perspective, gradient background, solid background, watermark, text, signature`
+5. **Color calibration pass.** After generation, check that enemy colors are warm/hostile (red, orange, magenta, green) and player/shield colors are cool/protective (cyan, blue, white, gold). Adjust hue/saturation in post if a generated asset drifts.
+
+### Post-Processing Pipeline (per asset)
+
+1. **Remove background** — If the generator doesn't support transparency natively, use background removal (e.g. rembg, Photoshop Select Subject, or manual masking against a solid color you specify in the prompt)
+2. **Trim** — Auto-trim transparent padding to the content bounding box
+3. **Uniform padding** — Add equal transparent padding so the sprite sits centered in its final dimensions
+4. **Downscale** — Resize from generation resolution to 2x game size using Lanczos/bicubic, then from 2x to 1x for the final asset. This two-step downscale preserves edge crispness.
+5. **Spritesheet assembly** — For multi-frame assets, ensure every frame is trimmed to the same bounding box size before stitching horizontally
+
+### Prompt Suffix (append to every prompt)
+
+Append this to the end of every individual generation prompt for consistency:
+
+> `Flat 2D top-down vector art. Neon glow on black void. No 3D, no shadows, no perspective. Clean geometric shapes. Transparent background. High contrast. Single isolated subject centered on canvas with padding.`
 
 ---
 

@@ -17,3 +17,7 @@ current game feels too easy on normal mode
 practice mode should stay easy, should also be able to spawn what ever type of enemy from a menu to ''practice." maybe this will be a dev tool only that we can comment in and out. 
 
 Need to add a hot key for left and right click maybe for people using laptop
+
+On mobile, should it listen to volume or whether ringer is on if possible? 
+
+mobile respoinse not great when turning phone mobile. 
