@@ -2204,45 +2204,193 @@ export class GameScene extends Phaser.Scene {
   private drawPlanet() {
     const g = this.planetGfx;
     g.clear();
+    const cx = this.cx, cy = this.cy;
+    const R = PLANET_R;
+    const ang = this.planetAngle;
+    const tilt = 0.34;
 
-    g.fillStyle(0x2244aa, 0.05);
-    g.fillCircle(this.cx, this.cy, 90);
-    g.fillStyle(0x2244aa, 0.08);
-    g.fillCircle(this.cx, this.cy, 65);
+    // ===== Atmospheric halo (soft outward glow) =====
+    g.fillStyle(0x2a4a88, 0.04); g.fillCircle(cx, cy, R + 44);
+    g.fillStyle(0x3d6dbf, 0.06); g.fillCircle(cx, cy, R + 28);
+    g.fillStyle(0x5a8ed8, 0.10); g.fillCircle(cx, cy, R + 14);
+    g.fillStyle(0x7fb0ee, 0.18); g.fillCircle(cx, cy, R + 5);
 
-    g.fillStyle(0x1a3388, 1);
-    g.fillCircle(this.cx, this.cy, PLANET_R);
-    g.fillStyle(0x2952b8, 0.7);
-    g.fillCircle(this.cx - 6, this.cy - 6, PLANET_R - 6);
-    g.fillStyle(0x4477dd, 0.25);
-    g.fillCircle(this.cx - 12, this.cy - 12, PLANET_R * 0.5);
+    // ===== Ring system: BACK half (behind the planet sphere) =====
+    this.drawRingSystem(g, cx, cy, R, ang, tilt, 'back');
 
+    // ===== Planet body: layered sphere with limb shading =====
+    g.fillStyle(0x081533, 1);         g.fillCircle(cx, cy, R);
+    g.fillStyle(0x13306e, 1);         g.fillCircle(cx - 2, cy - 3, R - 1);
+    g.fillStyle(0x2553a8, 1);         g.fillCircle(cx - 4, cy - 5, R - 4);
+    g.fillStyle(0x3b74d0, 0.85);      g.fillCircle(cx - 7, cy - 8, R - 9);
+
+    // Rotating continents
+    this.drawContinents(g, cx, cy, R, ang);
+
+    // Drifting clouds (faster than surface, slight offset)
+    this.drawClouds(g, cx, cy, R, ang * 1.35 + 0.7);
+
+    // Polar caps
+    g.fillStyle(0xdfe9ff, 0.45); g.fillEllipse(cx - 3, cy - R + 5, R * 0.95, 6);
+    g.fillStyle(0xdfe9ff, 0.28); g.fillEllipse(cx - 2, cy + R - 5, R * 0.8, 5);
+
+    // Sun-lit highlight (upper-left)
+    g.fillStyle(0x9ec9ff, 0.22); g.fillCircle(cx - 11, cy - 12, R * 0.55);
+    g.fillStyle(0xd6e4ff, 0.18); g.fillCircle(cx - 15, cy - 15, R * 0.28);
+
+    // Terminator / night-side shading (lower-right crescent)
+    g.fillStyle(0x000010, 0.30); g.fillCircle(cx + 7, cy + 6, R - 2);
+    g.fillStyle(0x000008, 0.25); g.fillCircle(cx + 11, cy + 9, R - 5);
+
+    // Edge limb darkening + subtle atmosphere rim
+    g.lineStyle(1.5, 0x03081a, 0.85); g.strokeCircle(cx, cy, R);
+    g.lineStyle(1,   0x88b8ff, 0.30); g.strokeCircle(cx, cy, R - 1);
+
+    // HP status ring
     const hpRatio = this.coreHP / this.maxHP;
     const hpColor = hpRatio > 0.6 ? 0x44ff88 : hpRatio > 0.3 ? 0xffaa44 : 0xff4466;
-    g.fillStyle(hpColor, 0.15);
-    g.fillCircle(this.cx, this.cy, PLANET_R + 6);
+    g.lineStyle(2, hpColor, 0.35); g.strokeCircle(cx, cy, R + 3);
 
     // Star Shield dome
     if (this.starShieldTimer > 0) {
       const pulseAlpha = 0.2 + Math.sin(this.gameTime * 0.005) * 0.1;
-      g.fillStyle(0xffcc44, pulseAlpha);
-      g.fillCircle(this.cx, this.cy, PLANET_R + 16);
-      g.lineStyle(2, 0xffcc44, 0.5);
-      g.strokeCircle(this.cx, this.cy, PLANET_R + 16);
+      g.fillStyle(0xffcc44, pulseAlpha); g.fillCircle(cx, cy, R + 16);
+      g.lineStyle(2, 0xffcc44, 0.5);    g.strokeCircle(cx, cy, R + 16);
 
-      // Countdown ring
       const ratio = this.starShieldTimer / 8000;
       g.lineStyle(3, 0xffcc44, 0.7);
       g.beginPath();
-      g.arc(this.cx, this.cy, PLANET_R + 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
+      g.arc(cx, cy, R + 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
       g.strokePath();
     }
 
-    const tilt = Math.sin(this.planetAngle) * 0.35 + 0.35;
-    g.lineStyle(2.5, 0x5599ff, 0.35);
-    g.strokeEllipse(this.cx, this.cy, PLANET_R * 3.2, PLANET_R * 3.2 * tilt);
-    g.lineStyle(1.5, 0x77bbff, 0.15);
-    g.strokeEllipse(this.cx, this.cy, PLANET_R * 4, PLANET_R * 4 * tilt);
+    // ===== Ring system: FRONT half (passes over the planet) =====
+    this.drawRingSystem(g, cx, cy, R, ang, tilt, 'front');
+  }
+
+  private drawContinents(g: Phaser.GameObjects.Graphics, cx: number, cy: number, R: number, ang: number) {
+    // [longitude, latitude, size, variantIdx]
+    const continents: [number, number, number, number][] = [
+      [0.0, -0.30, 11, 0],
+      [0.8,  0.20,  9, 1],
+      [1.6, -0.10, 10, 0],
+      [2.5,  0.45,  7, 1],
+      [3.3, -0.40, 12, 0],
+      [4.2,  0.10,  8, 1],
+      [5.1,  0.35,  9, 0],
+      [5.8, -0.25,  7, 1],
+    ];
+    const base = [0x2f6b3f, 0x3a7a4a];
+    const hi   = [0x5a9a6a, 0x6aaa7a];
+    for (const [lon, lat, size, v] of continents) {
+      const phi = lon + ang;
+      const cosP = Math.cos(phi);
+      if (cosP <= 0.02) continue;
+      const sinP = Math.sin(phi);
+      const cosLat = Math.cos(lat);
+      const px = cx + R * sinP * cosLat;
+      const py = cy + R * Math.sin(lat);
+      const sz = size * cosP;
+      const alpha = 0.6 * cosP;
+      g.fillStyle(base[v], alpha);
+      g.fillCircle(px, py, sz);
+      g.fillStyle(hi[v], alpha * 0.55);
+      g.fillCircle(px - sz * 0.25, py - sz * 0.25, sz * 0.5);
+    }
+  }
+
+  private drawClouds(g: Phaser.GameObjects.Graphics, cx: number, cy: number, R: number, ang: number) {
+    const clouds: [number, number, number][] = [
+      [0.5,  0.05, 15],
+      [1.9, -0.35, 11],
+      [3.1,  0.30, 13],
+      [4.3, -0.15, 10],
+      [5.5,  0.25, 12],
+    ];
+    for (const [lon, lat, size] of clouds) {
+      const phi = lon + ang;
+      const cosP = Math.cos(phi);
+      if (cosP <= 0.08) continue;
+      const sinP = Math.sin(phi);
+      const px = cx + R * sinP * Math.cos(lat);
+      const py = cy + R * Math.sin(lat);
+      const a = 0.2 * cosP;
+      g.fillStyle(0xffffff, a);
+      g.fillEllipse(px, py, size * cosP, size * 0.45 * cosP);
+      g.fillStyle(0xffffff, a * 0.6);
+      g.fillEllipse(px + size * 0.2, py + size * 0.1, size * 0.55 * cosP, size * 0.28 * cosP);
+    }
+  }
+
+  private drawRingSystem(
+    g: Phaser.GameObjects.Graphics,
+    cx: number, cy: number, R: number,
+    ang: number, tilt: number,
+    side: 'back' | 'front',
+  ) {
+    // Fixed, physically-consistent tilt. Rings are composed of concentric bands with a
+    // Cassini-style dark gap. Bands are drawn as arc halves; the back half is broken
+    // around the silhouette of the planet so the rings appear to pass behind it.
+    const bands: { r: number; w: number; color: number; alpha: number }[] = [
+      { r: R * 1.55, w: 4,  color: 0x4d6a94, alpha: 0.20 },
+      { r: R * 1.78, w: 9,  color: 0x95b5d8, alpha: 0.34 },
+      { r: R * 2.02, w: 2,  color: 0x1a2540, alpha: 0.28 }, // Cassini gap
+      { r: R * 2.25, w: 11, color: 0xb8d2ef, alpha: 0.38 },
+      { r: R * 2.58, w: 6,  color: 0x9cbbe0, alpha: 0.24 },
+      { r: R * 2.95, w: 3,  color: 0x6b89b8, alpha: 0.14 },
+    ];
+
+    const [a0, a1] = side === 'back' ? [Math.PI, Math.PI * 2] : [0, Math.PI];
+    const steps = 56;
+
+    for (const b of bands) {
+      const rx = b.r;
+      const ry = b.r * tilt;
+      g.lineStyle(b.w, b.color, b.alpha);
+      let drawing = false;
+      for (let i = 0; i <= steps; i++) {
+        const t = a0 + (a1 - a0) * (i / steps);
+        const x = cx + rx * Math.cos(t);
+        const y = cy + ry * Math.sin(t);
+        // Back half: skip segments occluded by the planet sphere
+        if (side === 'back') {
+          const dx = x - cx, dy = y - cy;
+          if (dx * dx + dy * dy < (R + 0.5) * (R + 0.5)) {
+            if (drawing) { g.strokePath(); drawing = false; }
+            continue;
+          }
+        }
+        if (!drawing) { g.beginPath(); g.moveTo(x, y); drawing = true; }
+        else g.lineTo(x, y);
+      }
+      if (drawing) g.strokePath();
+    }
+
+    // Orbiting debris particles — gives the rings visible motion
+    const N = 34;
+    for (let i = 0; i < N; i++) {
+      const bandIdx = i % bands.length;
+      if (bandIdx === 2) continue; // skip the dark gap
+      const band = bands[bandIdx];
+      const baseAng = (i * 0.618034) * Math.PI * 2; // golden-angle spread
+      const speedFactor = 2.2 - (band.r / R - 1.5) * 0.45; // inner particles orbit faster (Kepler)
+      const theta = baseAng + ang * speedFactor;
+      const jitter = ((i * 53) % 7) - 3;
+      const r = band.r + jitter;
+      const x = cx + r * Math.cos(theta);
+      const y = cy + r * tilt * Math.sin(theta);
+      const isFront = Math.sin(theta) > 0;
+      if ((side === 'front') !== isFront) continue;
+      // Occlusion check for back particles
+      if (side === 'back') {
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx + dy * dy < R * R) continue;
+      }
+      const sz = 0.9 + (i % 3) * 0.35;
+      const br = side === 'front' ? 0.75 : 0.45;
+      g.fillStyle(0xeaf2ff, br);
+      g.fillCircle(x, y, sz);
+    }
   }
 
   /* ===== HUD ===== */
