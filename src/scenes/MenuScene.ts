@@ -273,23 +273,156 @@ export class MenuScene extends Phaser.Scene {
 
     const px = this.cx;
     const py = this.cy - 340;
+    const R = 50;
+    const ang = this.planetAngle;
+    const tilt = 0.34;
 
-    g.fillStyle(0x2244aa, 0.06);
-    g.fillCircle(px, py, 120);
-    g.fillStyle(0x2244aa, 0.1);
-    g.fillCircle(px, py, 80);
-    g.fillStyle(0x1a3388, 1);
-    g.fillCircle(px, py, 50);
-    g.fillStyle(0x2952b8, 0.7);
-    g.fillCircle(px - 8, py - 8, 40);
-    g.fillStyle(0x4477dd, 0.3);
-    g.fillCircle(px - 14, py - 14, 22);
+    g.fillStyle(0x2a4a88, 0.04); g.fillCircle(px, py, R + 44);
+    g.fillStyle(0x3d6dbf, 0.06); g.fillCircle(px, py, R + 28);
+    g.fillStyle(0x5a8ed8, 0.10); g.fillCircle(px, py, R + 14);
+    g.fillStyle(0x7fb0ee, 0.18); g.fillCircle(px, py, R + 5);
 
-    const ringTilt = Math.sin(this.planetAngle) * 0.3 + 0.35;
-    g.lineStyle(2.5, 0x5599ff, 0.45);
-    g.strokeEllipse(px, py, 140, 140 * ringTilt);
-    g.lineStyle(1.5, 0x77bbff, 0.25);
-    g.strokeEllipse(px, py, 170, 170 * ringTilt);
+    this.drawMenuRings(g, px, py, R, ang, tilt, 'back');
+
+    g.fillStyle(0x081533, 1);         g.fillCircle(px, py, R);
+    g.fillStyle(0x13306e, 1);         g.fillCircle(px - 2, py - 3, R - 1);
+    g.fillStyle(0x2553a8, 1);         g.fillCircle(px - 4, py - 5, R - 4);
+    g.fillStyle(0x3b74d0, 0.85);      g.fillCircle(px - 7, py - 8, R - 9);
+
+    this.drawMenuContinents(g, px, py, R, ang);
+    this.drawMenuClouds(g, px, py, R, ang * 1.35 + 0.7);
+
+    g.fillStyle(0xdfe9ff, 0.45); g.fillEllipse(px - 3, py - R + 5, R * 0.95, 6);
+    g.fillStyle(0xdfe9ff, 0.28); g.fillEllipse(px - 2, py + R - 5, R * 0.8, 5);
+
+    g.fillStyle(0x9ec9ff, 0.22); g.fillCircle(px - 11, py - 12, R * 0.55);
+    g.fillStyle(0xd6e4ff, 0.18); g.fillCircle(px - 15, py - 15, R * 0.28);
+
+    g.fillStyle(0x000010, 0.30); g.fillCircle(px + 7, py + 6, R - 2);
+    g.fillStyle(0x000008, 0.25); g.fillCircle(px + 11, py + 9, R - 5);
+
+    g.lineStyle(1.5, 0x03081a, 0.85); g.strokeCircle(px, py, R);
+    g.lineStyle(1,   0x88b8ff, 0.30); g.strokeCircle(px, py, R - 1);
+
+    this.drawMenuRings(g, px, py, R, ang, tilt, 'front');
+  }
+
+  private drawMenuContinents(g: Phaser.GameObjects.Graphics, cx: number, cy: number, R: number, ang: number) {
+    const continents: [number, number, number, number][] = [
+      [0.0, -0.30, 11, 0],
+      [0.8,  0.20,  9, 1],
+      [1.6, -0.10, 10, 0],
+      [2.5,  0.45,  7, 1],
+      [3.3, -0.40, 12, 0],
+      [4.2,  0.10,  8, 1],
+      [5.1,  0.35,  9, 0],
+      [5.8, -0.25,  7, 1],
+    ];
+    const base = [0x2f6b3f, 0x3a7a4a];
+    const hi   = [0x5a9a6a, 0x6aaa7a];
+    for (const [lon, lat, size, v] of continents) {
+      const phi = lon + ang;
+      const cosP = Math.cos(phi);
+      if (cosP <= 0.02) continue;
+      const sinP = Math.sin(phi);
+      const cosLat = Math.cos(lat);
+      const px = cx + R * sinP * cosLat;
+      const py = cy + R * Math.sin(lat);
+      const sz = size * cosP;
+      const alpha = 0.6 * cosP;
+      g.fillStyle(base[v], alpha);
+      g.fillCircle(px, py, sz);
+      g.fillStyle(hi[v], alpha * 0.55);
+      g.fillCircle(px - sz * 0.25, py - sz * 0.25, sz * 0.5);
+    }
+  }
+
+  private drawMenuClouds(g: Phaser.GameObjects.Graphics, cx: number, cy: number, R: number, ang: number) {
+    const clouds: [number, number, number][] = [
+      [0.5,  0.05, 15],
+      [1.9, -0.35, 11],
+      [3.1,  0.30, 13],
+      [4.3, -0.15, 10],
+      [5.5,  0.25, 12],
+    ];
+    for (const [lon, lat, size] of clouds) {
+      const phi = lon + ang;
+      const cosP = Math.cos(phi);
+      if (cosP <= 0.08) continue;
+      const sinP = Math.sin(phi);
+      const px = cx + R * sinP * Math.cos(lat);
+      const py = cy + R * Math.sin(lat);
+      const a = 0.2 * cosP;
+      g.fillStyle(0xffffff, a);
+      g.fillEllipse(px, py, size * cosP, size * 0.45 * cosP);
+      g.fillStyle(0xffffff, a * 0.6);
+      g.fillEllipse(px + size * 0.2, py + size * 0.1, size * 0.55 * cosP, size * 0.28 * cosP);
+    }
+  }
+
+  private drawMenuRings(
+    g: Phaser.GameObjects.Graphics,
+    cx: number, cy: number, R: number,
+    ang: number, tilt: number,
+    side: 'back' | 'front',
+  ) {
+    const bands: { r: number; w: number; color: number; alpha: number }[] = [
+      { r: R * 1.55, w: 4,  color: 0x4d6a94, alpha: 0.20 },
+      { r: R * 1.78, w: 9,  color: 0x95b5d8, alpha: 0.34 },
+      { r: R * 2.02, w: 2,  color: 0x1a2540, alpha: 0.28 },
+      { r: R * 2.25, w: 11, color: 0xb8d2ef, alpha: 0.38 },
+      { r: R * 2.58, w: 6,  color: 0x9cbbe0, alpha: 0.24 },
+      { r: R * 2.95, w: 3,  color: 0x6b89b8, alpha: 0.14 },
+    ];
+
+    const [a0, a1] = side === 'back' ? [Math.PI, Math.PI * 2] : [0, Math.PI];
+    const steps = 56;
+
+    for (const b of bands) {
+      const rx = b.r;
+      const ry = b.r * tilt;
+      g.lineStyle(b.w, b.color, b.alpha);
+      let drawing = false;
+      for (let i = 0; i <= steps; i++) {
+        const t = a0 + (a1 - a0) * (i / steps);
+        const x = cx + rx * Math.cos(t);
+        const y = cy + ry * Math.sin(t);
+        if (side === 'back') {
+          const dx = x - cx, dy = y - cy;
+          if (dx * dx + dy * dy < (R + 0.5) * (R + 0.5)) {
+            if (drawing) { g.strokePath(); drawing = false; }
+            continue;
+          }
+        }
+        if (!drawing) { g.beginPath(); g.moveTo(x, y); drawing = true; }
+        else g.lineTo(x, y);
+      }
+      if (drawing) g.strokePath();
+    }
+
+    const N = 34;
+    for (let i = 0; i < N; i++) {
+      const bandIdx = i % bands.length;
+      if (bandIdx === 2) continue;
+      const band = bands[bandIdx];
+      const baseAng = (i * 0.618034) * Math.PI * 2;
+      const speedFactor = 2.2 - (band.r / R - 1.5) * 0.45;
+      const theta = baseAng + ang * speedFactor;
+      const jitter = ((i * 53) % 7) - 3;
+      const r = band.r + jitter;
+      const x = cx + r * Math.cos(theta);
+      const y = cy + r * tilt * Math.sin(theta);
+      const isFront = Math.sin(theta) > 0;
+      if ((side === 'front') !== isFront) continue;
+      if (side === 'back') {
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx + dy * dy < R * R) continue;
+      }
+      const sz = 0.9 + (i % 3) * 0.35;
+      const br = side === 'front' ? 0.75 : 0.45;
+      g.fillStyle(0xeaf2ff, br);
+      g.fillCircle(x, y, sz);
+    }
   }
 
   private createBoxButton(x: number, y: number, w: number, h: number, label: string, accent: number, cb: () => void): Phaser.GameObjects.Container {
