@@ -74,7 +74,7 @@ export class GameOverScene extends Phaser.Scene {
       yPos = this.cy - 220;
     }
 
-    const title = this.add.text(this.cx, yPos, 'THE CORE HAS FALLEN', {
+    const title = this.add.text(this.cx, yPos, 'YOUR PLANET HAS FALLEN', {
       fontSize: m ? '28px' : '42px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',

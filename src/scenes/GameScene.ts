@@ -179,6 +179,7 @@ export class GameScene extends Phaser.Scene {
   ];
   private firstItemEarned = false;
   private itemTutorialShown = false;
+  private itemTutorialContainer: Phaser.GameObjects.Container | null = null;
 
   // Active effects
   private timeBenderTimer = 0;
@@ -210,11 +211,14 @@ export class GameScene extends Phaser.Scene {
   private lbContainer!: Phaser.GameObjects.Container;
   private showingLB = false;
   private tooltip!: Phaser.GameObjects.Text | null;
-  private itemTutorialText: Phaser.GameObjects.Text | null = null;
 
   private audio!: AudioManager;
   private planetAngle = 0;
-  private stars: { x: number; y: number; s: number; a: number }[] = [];
+  private stars: { x: number; y: number; s: number; a: number; speed: number; twinkle: number }[] = [];
+  private starsW = 0;
+  private starsH = 0;
+  private starDirX = 0;
+  private starDirY = 1;
   private practicePanel: Phaser.GameObjects.Container | null = null;
   private practicePanelBounds = { x: 0, y: 0, w: 0, h: 0 };
   private practicePanelExpanded = true;
@@ -252,7 +256,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.firstItemEarned = false;
     this.itemTutorialShown = false;
-    this.itemTutorialText = null;
+    this.itemTutorialContainer = null;
     this.timeBenderTimer = 0;
     this.timeFreezeTimer = 0;
     this.starShieldTimer = 0;
@@ -297,7 +301,7 @@ export class GameScene extends Phaser.Scene {
     if (!StorageManager.hasSeenIntro() || this.mode === 'practice') {
       const msg = this.mode === 'practice'
         ? 'PRACTICE MODE — No damage, no score recording'
-        : `${this.isMobile ? 'Tap' : 'Click'} anywhere to place a force field — protect the Core!`;
+        : `${this.isMobile ? 'Tap' : 'Click'} anywhere to place a force field — protect your Planet!`;
       this.tooltip = this.add.text(this.cx, this.cy + PLANET_R + 60, msg, {
         fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#667799',
       }).setOrigin(0.5).setDepth(50);
@@ -1734,19 +1738,106 @@ export class GameScene extends Phaser.Scene {
 
     if (!this.firstItemEarned) {
       this.firstItemEarned = true;
-      if (!this.itemTutorialShown) {
+      if (!this.itemTutorialShown && !StorageManager.hasSeenItemIntro()) {
         this.itemTutorialShown = true;
-        const tutorialMsg = this.isMobile ? 'Tap item slot to use' : 'Right-click to use item';
-        this.itemTutorialText = this.add.text(this.cx, this.scale.height - 100, tutorialMsg, {
-          fontSize: '16px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#667799',
-        }).setOrigin(0.5).setDepth(50);
-        this.time.delayedCall(5000, () => {
-          if (this.itemTutorialText) {
-            this.itemTutorialText.destroy();
-            this.itemTutorialText = null;
-          }
-        });
+        this.showItemIntroModal();
       }
+    }
+  }
+
+  private showItemIntroModal() {
+    if (this.itemTutorialContainer) return;
+
+    if (this.state !== 'paused' && this.state !== 'gameOver') {
+      this.prevState = this.state;
+      this.state = 'paused';
+    }
+
+    const panelW = Math.min(this.scale.width - 32, 460);
+    const panelH = 380;
+    const container = this.add.container(0, 0).setDepth(130);
+
+    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.7)
+      .setInteractive();
+
+    const panel = this.add.graphics();
+    const panelX = this.cx;
+    const panelY = this.cy;
+    panel.fillStyle(0x0b1224, 0.96);
+    panel.fillRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
+    panel.lineStyle(1.5, 0x2a4a70, 0.9);
+    panel.strokeRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
+    this.drawCornerBrackets(panel, panelX, panelY, panelW, panelH, 0xffcc44);
+
+    const title = this.add.text(panelX, panelY - panelH / 2 + 38, 'YOU GOT A NEW ITEM!', {
+      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#ffcc44', fontStyle: 'bold',
+    } as any).setOrigin(0.5);
+    (title as any).setLetterSpacing?.(3);
+
+    const underline = this.add.graphics();
+    underline.fillStyle(0xffcc44, 0.85);
+    underline.fillRect(panelX - 36, panelY - panelH / 2 + 60, 72, 2);
+
+    const description = this.add.text(
+      panelX, panelY - 72,
+      'Items are powerful, single-use abilities\n' +
+      'that queue up in the slots at the top of the screen.',
+      {
+        fontSize: '14px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#cfd8e3', align: 'center', lineSpacing: 6,
+      },
+    ).setOrigin(0.5);
+
+    // Draw the ? orb icon
+    const orbY = panelY - 4;
+    const orbGfx = this.add.graphics();
+    orbGfx.fillStyle(0xffffff, 0.06);
+    orbGfx.fillCircle(panelX, orbY, 24);
+    orbGfx.lineStyle(2, 0xffffff, 0.6);
+    orbGfx.strokeCircle(panelX, orbY, 20);
+    const orbLabel = this.add.text(panelX, orbY, '?', {
+      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      fontStyle: 'bold', color: '#ffffff',
+    }).setOrigin(0.5);
+
+    const earnText = this.add.text(
+      panelX, orbY + 48,
+      'Collect these floating orbs to earn items.\n' +
+      'You can also earn items from multi-kills\n' +
+      'and perfect waves.',
+      {
+        fontSize: '13px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#8899aa', align: 'center', lineSpacing: 5,
+      },
+    ).setOrigin(0.5);
+
+    const howToText = this.isMobile
+      ? 'Tap the item slot to use it.'
+      : 'Right-click to use the item in Slot 1.';
+    const howTo = this.add.text(panelX, panelY + panelH / 2 - 100, howToText, {
+      fontSize: '15px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#4aa4ff', fontStyle: 'bold', align: 'center',
+    } as any).setOrigin(0.5);
+
+    const okBtn = this.createPauseBoxButton(panelX, panelY + panelH / 2 - 46, 180, 42, 'OKAY', 0xffcc44, '#ffe9a8', () => {
+      this.audio.playClick();
+      this.closeItemIntroModal();
+    });
+
+    container.add([bg, panel, title, underline, description, orbGfx, orbLabel, earnText, howTo, okBtn]);
+    this.itemTutorialContainer = container;
+
+    StorageManager.setSeenItemIntro();
+  }
+
+  private closeItemIntroModal() {
+    if (!this.itemTutorialContainer) return;
+    this.itemTutorialContainer.destroy();
+    this.itemTutorialContainer = null;
+
+    if (this.state === 'paused' && !this.pauseContainer.visible) {
+      this.state = this.prevState;
     }
   }
 
@@ -1879,11 +1970,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.runStats.itemsUsed++;
-
-    if (this.itemTutorialText) {
-      this.itemTutorialText.destroy();
-      this.itemTutorialText = null;
-    }
 
     switch (item) {
       case 'gravityField': this.activateGravityField(mx, my); break;
@@ -2219,7 +2305,7 @@ export class GameScene extends Phaser.Scene {
 
     const hpRatio = this.coreHP / this.maxHP;
     const hpPct = Math.round(hpRatio * 100);
-    this.hpText.setText(this.isMobile ? `${hpPct}%` : `CORE ${hpPct}%`);
+    this.hpText.setText(this.isMobile ? `${hpPct}%` : `HEALTH ${hpPct}%`);
     this.hpText.setColor(hpRatio > 0.6 ? '#44ff88' : hpRatio > 0.3 ? '#ffaa44' : '#ff4466');
 
     const name = StorageManager.getGuardianName();
@@ -2348,74 +2434,171 @@ export class GameScene extends Phaser.Scene {
 
   private createPauseOverlay() {
     this.pauseContainer = this.add.container(0, 0).setDepth(100).setVisible(false);
-    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.7)
+    const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 1)
       .setInteractive();
-    const title = this.add.text(this.cx, this.cy - 60, 'PAUSED', {
-      fontSize: '40px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#ffffff', align: 'center',
-    }).setOrigin(0.5);
+    bg.on('pointerdown', () => { this.audio.playClick(); this.togglePause(); });
 
-    const menuX = this.cx - 110;
+    const panelW = 380;
+    const panelH = 340;
+    const panelX = this.cx;
+    const panelY = this.cy;
 
-    const resumeBtn = this.add.text(menuX, this.cy - 5, '▶  RESUME', {
-      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#4499cc', padding: { x: 24, y: 8 },
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    resumeBtn.on('pointerover', () => { resumeBtn.setColor('#ffffff'); resumeBtn.setScale(1.05); });
-    resumeBtn.on('pointerout', () => { resumeBtn.setColor('#4499cc'); resumeBtn.setScale(1); });
-    resumeBtn.on('pointerdown', () => { this.audio.playClick(); this.togglePause(); });
+    const panelHit = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0).setInteractive();
 
-    const lbBtn = this.add.text(menuX, this.cy + 45, '☰  LEADERBOARD', {
-      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#4499cc', padding: { x: 24, y: 8 },
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    lbBtn.on('pointerover', () => { lbBtn.setColor('#ffffff'); lbBtn.setScale(1.05); });
-    lbBtn.on('pointerout', () => { lbBtn.setColor('#4499cc'); lbBtn.setScale(1); });
-    lbBtn.on('pointerdown', () => { this.audio.playClick(); this.toggleLB(); });
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0b1224, 0.92);
+    panel.fillRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
+    panel.lineStyle(1.5, 0x2a4a70, 0.9);
+    panel.strokeRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
+    this.drawCornerBrackets(panel, panelX, panelY, panelW, panelH, 0x4aa4ff);
 
-    const quitBtn = this.add.text(menuX, this.cy + 95, '✕  QUIT GAME', {
-      fontSize: '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#cc4444', padding: { x: 24, y: 8 },
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    quitBtn.on('pointerover', () => { quitBtn.setColor('#ff6666'); quitBtn.setScale(1.05); });
-    quitBtn.on('pointerout', () => { quitBtn.setColor('#cc4444'); quitBtn.setScale(1); });
-    quitBtn.on('pointerdown', () => { this.audio.playClick(); this.showQuitConfirm(); });
+    const title = this.add.text(panelX, panelY - 120, 'PAUSED', {
+      fontSize: '36px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#ffffff', fontStyle: 'bold',
+    } as any).setOrigin(0.5);
+    (title as any).setLetterSpacing?.(6);
 
-    this.pauseContainer.add([bg, title, resumeBtn, lbBtn, quitBtn]);
+    const underline = this.add.graphics();
+    underline.fillStyle(0x4aa4ff, 0.85);
+    underline.fillRect(panelX - 28, panelY - 98, 56, 2);
+
+    const btnW = 260;
+    const btnH = 44;
+    const btnGap = 12;
+    const firstBtnY = panelY - 40;
+
+    const resumeBtn = this.createPauseBoxButton(panelX, firstBtnY, btnW, btnH, '▶  RESUME', 0x4aa4ff, '#dbeaff', () => {
+      this.audio.playClick();
+      this.togglePause();
+    });
+
+    const lbBtn = this.createPauseBoxButton(panelX, firstBtnY + (btnH + btnGap), btnW, btnH, '☰  LEADERBOARD', 0x4aa4ff, '#dbeaff', () => {
+      this.audio.playClick();
+      this.toggleLB();
+    });
+
+    const quitBtn = this.createPauseBoxButton(panelX, firstBtnY + (btnH + btnGap) * 2, btnW, btnH, '✕  QUIT GAME', 0xcc4455, '#ffc8cc', () => {
+      this.audio.playClick();
+      this.showQuitConfirm();
+    });
+
+    this.pauseContainer.add([bg, panel, panelHit, title, underline, resumeBtn, lbBtn, quitBtn]);
 
     this.createQuitConfirmOverlay();
   }
 
+  private drawCornerBrackets(g: Phaser.GameObjects.Graphics, cx: number, cy: number, w: number, h: number, color: number) {
+    const left = cx - w / 2;
+    const right = cx + w / 2;
+    const top = cy - h / 2;
+    const bot = cy + h / 2;
+    const inset = 10;
+    const len = 16;
+
+    g.lineStyle(2, color, 0.9);
+    // top-left
+    g.beginPath();
+    g.moveTo(left + inset, top + inset + len);
+    g.lineTo(left + inset, top + inset);
+    g.lineTo(left + inset + len, top + inset);
+    g.strokePath();
+    // top-right
+    g.beginPath();
+    g.moveTo(right - inset - len, top + inset);
+    g.lineTo(right - inset, top + inset);
+    g.lineTo(right - inset, top + inset + len);
+    g.strokePath();
+    // bottom-left
+    g.beginPath();
+    g.moveTo(left + inset, bot - inset - len);
+    g.lineTo(left + inset, bot - inset);
+    g.lineTo(left + inset + len, bot - inset);
+    g.strokePath();
+    // bottom-right
+    g.beginPath();
+    g.moveTo(right - inset - len, bot - inset);
+    g.lineTo(right - inset, bot - inset);
+    g.lineTo(right - inset, bot - inset - len);
+    g.strokePath();
+  }
+
+  private createPauseBoxButton(x: number, y: number, w: number, h: number, label: string, accent: number, textColor: string, cb: () => void): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+    const gfx = this.add.graphics();
+
+    const draw = (hover: boolean) => {
+      gfx.clear();
+      gfx.fillStyle(0x0b1224, hover ? 0.95 : 0.8);
+      gfx.fillRoundedRect(-w / 2, -h / 2, w, h, 8);
+      gfx.lineStyle(1.5, accent, hover ? 1 : 0.6);
+      gfx.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
+    };
+    draw(false);
+
+    const text = this.add.text(0, 0, label, {
+      fontSize: '17px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: textColor, fontStyle: 'bold',
+    } as any).setOrigin(0.5);
+    (text as any).setLetterSpacing?.(2);
+
+    const hit = this.add.rectangle(0, 0, w, h, 0x000000, 0).setInteractive({ useHandCursor: true });
+    hit.on('pointerover', () => { draw(true); text.setColor('#ffffff'); });
+    hit.on('pointerout', () => { draw(false); text.setColor(textColor); });
+    hit.on('pointerdown', cb);
+
+    container.add([gfx, text, hit]);
+    return container;
+  }
+
   private createQuitConfirmOverlay() {
     this.quitConfirmContainer = this.add.container(0, 0).setDepth(120).setVisible(false);
+
     const bg = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.8)
       .setInteractive();
-    const box = this.add.rectangle(this.cx, this.cy, 360, 180, 0x0a0a1a, 0.95).setStrokeStyle(2, 0x335577);
-    const msg = this.add.text(this.cx, this.cy - 40, 'Quit to main menu?\nAll progress will be lost.', {
-      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#ffffff', align: 'center', lineSpacing: 6,
+
+    const panelW = 400;
+    const panelH = 240;
+    const px = this.cx;
+    const py = this.cy;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0b1224, 0.96);
+    panel.fillRoundedRect(px - panelW / 2, py - panelH / 2, panelW, panelH, 14);
+    panel.lineStyle(1.5, 0x2a4a70, 0.9);
+    panel.strokeRoundedRect(px - panelW / 2, py - panelH / 2, panelW, panelH, 14);
+    this.drawCornerBrackets(panel, px, py, panelW, panelH, 0xcc4455);
+
+    const title = this.add.text(px, py - panelH / 2 + 38, 'QUIT GAME?', {
+      fontSize: '24px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#ffffff', fontStyle: 'bold',
+    } as any).setOrigin(0.5);
+    (title as any).setLetterSpacing?.(4);
+
+    const underline = this.add.graphics();
+    underline.fillStyle(0xcc4455, 0.85);
+    underline.fillRect(px - 24, py - panelH / 2 + 60, 48, 2);
+
+    const msg = this.add.text(px, py - 20, 'All progress will be lost.', {
+      fontSize: '14px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#8899aa', align: 'center',
     }).setOrigin(0.5);
 
-    const yesBtn = this.add.text(this.cx - 60, this.cy + 35, 'YES, QUIT', {
-      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#cc4444', padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    yesBtn.on('pointerover', () => { yesBtn.setColor('#ff6666'); yesBtn.setScale(1.05); });
-    yesBtn.on('pointerout', () => { yesBtn.setColor('#cc4444'); yesBtn.setScale(1); });
-    yesBtn.on('pointerdown', () => {
+    const btnW = 150;
+    const btnH = 42;
+    const btnGap = 16;
+    const btnY = py + panelH / 2 - 48;
+
+    const yesBtn = this.createPauseBoxButton(px - btnW / 2 - btnGap / 2, btnY, btnW, btnH, 'YES, QUIT', 0xcc4455, '#ffc8cc', () => {
       this.audio.playClick();
       this.scene.start('MenuScene');
     });
 
-    const noBtn = this.add.text(this.cx + 60, this.cy + 35, 'CANCEL', {
-      fontSize: '18px', fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#4499cc', padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    noBtn.on('pointerover', () => { noBtn.setColor('#ffffff'); noBtn.setScale(1.05); });
-    noBtn.on('pointerout', () => { noBtn.setColor('#4499cc'); noBtn.setScale(1); });
-    noBtn.on('pointerdown', () => { this.audio.playClick(); this.hideQuitConfirm(); });
+    const noBtn = this.createPauseBoxButton(px + btnW / 2 + btnGap / 2, btnY, btnW, btnH, 'CANCEL', 0x4aa4ff, '#dbeaff', () => {
+      this.audio.playClick();
+      this.hideQuitConfirm();
+    });
 
-    this.quitConfirmContainer.add([bg, box, msg, yesBtn, noBtn]);
+    this.quitConfirmContainer.add([bg, panel, title, underline, msg, yesBtn, noBtn]);
   }
 
   private showQuitConfirm() {
@@ -2428,6 +2611,7 @@ export class GameScene extends Phaser.Scene {
 
   private togglePause() {
     if (this.state === 'gameOver') return;
+    if (this.itemTutorialContainer) return;
     if (this.showingLB) this.toggleLB();
     if (this.state === 'paused') {
       this.state = this.prevState;
@@ -2455,28 +2639,44 @@ export class GameScene extends Phaser.Scene {
     if (this.showingLB) {
       this.lbContainer.removeAll(true);
       const bg = this.add.rectangle(0, 0, 480, 380, 0x0a0a1a, 0.75).setStrokeStyle(2, 0x335577);
-      const title = this.add.text(0, -165, 'LEADERBOARD', {
+      const title = this.add.text(0, -165, 'MY LEADERBOARD', {
         fontSize: '20px', fontFamily: '"Segoe UI", system-ui, sans-serif',
         color: '#4af', fontStyle: 'bold',
       }).setOrigin(0.5);
-      const hdr = this.add.text(-210, -130, 'RANK  NAME             RANK        WAVE   SCORE', {
-        fontSize: '10px', fontFamily: 'monospace', color: '#556677',
-      });
-      this.lbContainer.add([bg, title, hdr]);
+      this.lbContainer.add([bg, title]);
 
       const entries = StorageManager.getLeaderboard().slice(0, 10);
-      entries.forEach((e, i) => {
-        const rank = String(i + 1).padStart(2);
-        const name = e.name.padEnd(16);
-        const titleStr = (e.title || '').padEnd(10);
-        const wave = String(e.wave).padStart(4);
-        const score = String(e.score).padStart(7);
-        const row = this.add.text(-210, -100 + i * 24, `${rank}    ${name} ${titleStr} ${wave}   ${score}`, {
-          fontSize: '12px', fontFamily: 'monospace',
-          color: i === 0 ? '#ffcc44' : i < 3 ? '#44aaff' : '#8899aa',
+      if (entries.length === 0) {
+        const empty = this.add.text(0, 0, 'No scores stored yet.\nFinish a Competitive run to start your record.', {
+          fontSize: '14px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+          color: '#8899aa', align: 'center', lineSpacing: 6,
+        }).setOrigin(0.5);
+        this.lbContainer.add(empty);
+      } else {
+        const hdr = this.add.text(-210, -130, 'RANK  NAME             RANK        WAVE   SCORE', {
+          fontSize: '10px', fontFamily: 'monospace', color: '#556677',
         });
-        this.lbContainer.add(row);
-      });
+        this.lbContainer.add(hdr);
+
+        entries.forEach((e, i) => {
+          const rank = String(i + 1).padStart(2);
+          const name = e.name.padEnd(16);
+          const titleStr = (e.title || '').padEnd(10);
+          const wave = String(e.wave).padStart(4);
+          const score = String(e.score).padStart(7);
+          const row = this.add.text(-210, -100 + i * 24, `${rank}    ${name} ${titleStr} ${wave}   ${score}`, {
+            fontSize: '12px', fontFamily: 'monospace',
+            color: i === 0 ? '#ffcc44' : i < 3 ? '#44aaff' : '#8899aa',
+          });
+          this.lbContainer.add(row);
+        });
+      }
+
+      const comingSoon = this.add.text(0, 128, '🌐  Global leaderboard coming soon', {
+        fontSize: '12px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#556677', fontStyle: 'italic',
+      }).setOrigin(0.5);
+      this.lbContainer.add(comingSoon);
 
       const close = this.add.text(0, 160, '[ CLOSE ]', {
         fontSize: '13px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
@@ -2660,20 +2860,68 @@ export class GameScene extends Phaser.Scene {
 
   private generateStars() {
     this.stars = [];
-    for (let i = 0; i < 100; i++) {
+    this.starsW = Math.max(this.scale.width, 1200);
+    this.starsH = Math.max(this.scale.height, 900);
+
+    const dirIdx = Math.floor(Math.random() * 8);
+    const angle = (dirIdx * Math.PI) / 4;
+    this.starDirX = Math.cos(angle);
+    this.starDirY = Math.sin(angle);
+
+    const count = 300;
+    for (let i = 0; i < count; i++) {
+      const layer = Math.random();
+      let s: number, a: number, speed: number;
+      if (layer < 0.6) {
+        s = Math.random() * 0.7 + 0.2;
+        a = Math.random() * 0.25 + 0.1;
+        speed = 3;
+      } else if (layer < 0.9) {
+        s = Math.random() * 1.1 + 0.5;
+        a = Math.random() * 0.3 + 0.25;
+        speed = 7;
+      } else {
+        s = Math.random() * 1.4 + 1.0;
+        a = Math.random() * 0.3 + 0.45;
+        speed = 13;
+      }
       this.stars.push({
-        x: Math.random() * 2400,
-        y: Math.random() * 1400,
-        s: Math.random() * 1.5 + 0.3,
-        a: Math.random() * 0.4 + 0.1,
+        x: Math.random() * this.starsW,
+        y: Math.random() * this.starsH,
+        s, a, speed,
+        twinkle: Math.random() * Math.PI * 2,
       });
     }
   }
 
   private drawBackground() {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    if (w > this.starsW) this.starsW = w;
+    if (h > this.starsH) this.starsH = h;
+
+    const dt = Math.min(this.game.loop.delta, 50) / 1000;
+    const paused = this.state === 'paused';
+    const frozen = this.timeFreezeTimer > 0;
+    const speedMul = paused ? 0.25 : frozen ? 0 : 1;
+    const t = this.gameTime;
+    const dx = this.starDirX;
+    const dy = this.starDirY;
+    const margin = 4;
+
     this.bgGfx.clear();
     for (const s of this.stars) {
-      this.bgGfx.fillStyle(0xffffff, s.a);
+      s.x += s.speed * speedMul * dx * dt;
+      s.y += s.speed * speedMul * dy * dt;
+
+      if (s.x > w + margin) { s.x = -margin; s.y = Math.random() * h; }
+      else if (s.x < -margin) { s.x = w + margin; s.y = Math.random() * h; }
+
+      if (s.y > h + margin) { s.y = -margin; s.x = Math.random() * w; }
+      else if (s.y < -margin) { s.y = h + margin; s.x = Math.random() * w; }
+
+      const tw = 0.75 + 0.25 * Math.sin(t * 0.002 + s.twinkle);
+      this.bgGfx.fillStyle(0xffffff, Math.min(1, s.a * tw));
       this.bgGfx.fillCircle(s.x, s.y, s.s);
     }
   }

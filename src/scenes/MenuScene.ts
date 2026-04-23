@@ -7,8 +7,13 @@ export class MenuScene extends Phaser.Scene {
   private cy = 0;
   private planetAngle = 0;
   private planetGfx!: Phaser.GameObjects.Graphics;
-  private starField: { x: number; y: number; s: number; a: number }[] = [];
+  private starField: { x: number; y: number; s: number; a: number; speed: number; twinkle: number }[] = [];
+  private starFieldW = 0;
+  private starFieldH = 0;
+  private starDirX = 0;
+  private starDirY = 1;
   private leaderboardContainer!: Phaser.GameObjects.Container;
+  private leaderboardBackdrop!: Phaser.GameObjects.Rectangle;
   private aboutContainer!: Phaser.GameObjects.Container;
   private showingLB = false;
   private showingAbout = false;
@@ -27,7 +32,7 @@ export class MenuScene extends Phaser.Scene {
 
   private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
-  private menuButtons: Phaser.GameObjects.Text[] = [];
+  private menuButtons: Phaser.GameObjects.Container[] = [];
   private volText!: Phaser.GameObjects.Text;
   private nameText!: Phaser.GameObjects.Text;
 
@@ -45,64 +50,70 @@ export class MenuScene extends Phaser.Scene {
     this.generateStars();
     this.planetGfx = this.add.graphics();
 
-    this.titleText = this.add.text(this.cx, this.cy - 10, 'SHIELDR', {
-      fontSize: '72px',
+    this.titleText = this.add.text(this.cx, this.cy - 140, 'SHIELDR', {
+      fontSize: '88px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       fontStyle: 'bold',
-      color: '#44aaff',
-    }).setOrigin(0.5).setDepth(10);
-    this.titleText.setShadow(0, 0, '#44aaff', 20, true, true);
+      color: '#ffffff',
+    } as any).setOrigin(0.5).setDepth(10);
+    this.titleText.setLetterSpacing?.(4);
 
-    this.subtitleText = this.add.text(this.cx, this.cy + 48, 'PROTECT THE CORE', {
-      fontSize: '16px',
+    this.subtitleText = this.add.text(this.cx, this.cy - 82, 'PROTECT YOUR PLANET', {
+      fontSize: '14px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#667788',
-    }).setOrigin(0.5).setDepth(10);
+      color: '#6a8aa8',
+    } as any).setOrigin(0.5).setDepth(10);
+    this.subtitleText.setLetterSpacing?.(6);
 
     this.menuButtons = [];
-    const menuX = this.cx - 100;
+    const btnW = 260;
+    const btnH = 44;
+    const btnGap = 12;
+    const firstBtnY = this.cy - 20;
 
-    this.menuButtons.push(this.createButton(menuX, this.cy + 100, '▶  COMPETITIVE', () => {
+    this.menuButtons.push(this.createBoxButton(this.cx, firstBtnY, btnW, btnH, '▶  COMPETITIVE', 0x4aa4ff, () => {
       this.audio.playClick();
       this.scene.start('GameScene', { mode: 'competitive' });
     }));
 
-    this.menuButtons.push(this.createButton(menuX, this.cy + 145, '◎  PRACTICE', () => {
+    this.menuButtons.push(this.createBoxButton(this.cx, firstBtnY + (btnH + btnGap), btnW, btnH, '◎  PRACTICE', 0x4aa4ff, () => {
       this.audio.playClick();
       this.scene.start('GameScene', { mode: 'practice' });
     }));
 
-    this.menuButtons.push(this.createButton(menuX, this.cy + 190, '☰  LEADERBOARD', () => {
+    this.menuButtons.push(this.createBoxButton(this.cx, firstBtnY + (btnH + btnGap) * 2, btnW, btnH, '☰  LEADERBOARD', 0x4aa4ff, () => {
       this.audio.playClick();
       this.toggleLeaderboard();
     }));
 
-    this.menuButtons.push(this.createButton(menuX, this.cy + 235, 'ⓘ  HOW TO PLAY', () => {
+    this.menuButtons.push(this.createBoxButton(this.cx, firstBtnY + (btnH + btnGap) * 3, btnW, btnH, 'ⓘ  HOW TO PLAY', 0x4aa4ff, () => {
       this.audio.playClick();
       this.toggleAbout();
     }));
 
-    this.volText = this.add.text(menuX, this.cy + 290, this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF', {
-      fontSize: '14px',
+    const footerY = firstBtnY + (btnH + btnGap) * 3 + btnH / 2 + 28;
+
+    this.volText = this.add.text(this.cx, footerY, this.audio.enabled ? '♫  SOUND: ON' : '♫  SOUND: OFF', {
+      fontSize: '13px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#556677',
-    }).setOrigin(0, 0.5).setDepth(10).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
 
     this.volText.on('pointerdown', () => {
       this.audio.enabled = !this.audio.enabled;
       StorageManager.setVolume(this.audio.enabled);
-      this.volText.setText(this.audio.enabled ? '♫ SOUND: ON' : '♫ SOUND: OFF');
+      this.volText.setText(this.audio.enabled ? '♫  SOUND: ON' : '♫  SOUND: OFF');
       if (this.audio.enabled) this.audio.playClick();
     });
     this.volText.on('pointerover', () => this.volText.setColor('#aabbcc'));
     this.volText.on('pointerout', () => this.volText.setColor('#556677'));
 
     const currentName = StorageManager.getGuardianName();
-    this.nameText = this.add.text(menuX, this.cy + 325, `✎ ${currentName}`, {
-      fontSize: '14px',
+    this.nameText = this.add.text(this.cx, footerY + 22, `✎  ${currentName}`, {
+      fontSize: '13px',
       fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#556677',
-    }).setOrigin(0, 0.5).setDepth(10).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
 
     this.nameText.on('pointerdown', () => {
       this.audio.playClick();
@@ -142,18 +153,20 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private repositionUI() {
-    const menuX = this.cx - 100;
-    const buttonOffsets = [100, 145, 190, 235];
+    const btnH = 44;
+    const btnGap = 12;
+    const firstBtnY = this.cy - 20;
 
-    this.titleText.setPosition(this.cx, this.cy - 10);
-    this.subtitleText.setPosition(this.cx, this.cy + 48);
+    this.titleText.setPosition(this.cx, this.cy - 140);
+    this.subtitleText.setPosition(this.cx, this.cy - 82);
 
     this.menuButtons.forEach((btn, i) => {
-      btn.setPosition(menuX, this.cy + buttonOffsets[i]);
+      btn.setPosition(this.cx, firstBtnY + (btnH + btnGap) * i);
     });
 
-    this.volText.setPosition(menuX, this.cy + 290);
-    this.nameText.setPosition(menuX, this.cy + 325);
+    const footerY = firstBtnY + (btnH + btnGap) * 3 + btnH / 2 + 28;
+    this.volText.setPosition(this.cx, footerY);
+    this.nameText.setPosition(this.cx, footerY + 22);
 
     this.leaderboardContainer.setPosition(this.cx, this.cy);
     this.aboutContainer.setPosition(this.cx, this.cy);
@@ -181,34 +194,85 @@ export class MenuScene extends Phaser.Scene {
     this.aboutMaskGfx.fillRect(this.cx + contentX, this.cy + contentTop, contentW, contentH);
   }
 
-  update(_time: number, delta: number) {
+  update(time: number, delta: number) {
     this.planetAngle += delta * 0.0003;
-    this.drawBackground();
+    this.updateStars(delta);
+    this.drawBackground(time);
   }
 
   private generateStars() {
     this.starField = [];
-    for (let i = 0; i < 120; i++) {
+    this.starFieldW = Math.max(this.scale.width, 1200);
+    this.starFieldH = Math.max(this.scale.height, 900);
+
+    // Pick a random travel direction: 8 cardinals/diagonals, equal chance.
+    const dirIdx = Math.floor(Math.random() * 8);
+    const angle = (dirIdx * Math.PI) / 4;
+    this.starDirX = Math.cos(angle);
+    this.starDirY = Math.sin(angle);
+
+    const count = 320;
+    for (let i = 0; i < count; i++) {
+      // Three parallax layers: far (slow, dim, small), mid, near (fast, bright, larger).
+      const layer = Math.random();
+      let s: number, a: number, speed: number;
+      if (layer < 0.55) {
+        s = Math.random() * 0.8 + 0.3;
+        a = Math.random() * 0.35 + 0.15;
+        speed = 4;
+      } else if (layer < 0.88) {
+        s = Math.random() * 1.2 + 0.7;
+        a = Math.random() * 0.4 + 0.35;
+        speed = 9;
+      } else {
+        s = Math.random() * 1.6 + 1.2;
+        a = Math.random() * 0.35 + 0.6;
+        speed = 16;
+      }
       this.starField.push({
-        x: Math.random() * 2000,
-        y: Math.random() * 1200,
-        s: Math.random() * 2 + 0.5,
-        a: Math.random() * 0.6 + 0.2,
+        x: Math.random() * this.starFieldW,
+        y: Math.random() * this.starFieldH,
+        s, a, speed,
+        twinkle: Math.random() * Math.PI * 2,
       });
     }
   }
 
-  private drawBackground() {
+  private updateStars(delta: number) {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    if (w > this.starFieldW) this.starFieldW = w;
+    if (h > this.starFieldH) this.starFieldH = h;
+
+    const dt = delta / 1000;
+    const dx = this.starDirX;
+    const dy = this.starDirY;
+    const margin = 4;
+
+    for (const s of this.starField) {
+      s.x += s.speed * dx * dt;
+      s.y += s.speed * dy * dt;
+
+      if (s.x > w + margin) { s.x = -margin; s.y = Math.random() * h; }
+      else if (s.x < -margin) { s.x = w + margin; s.y = Math.random() * h; }
+
+      if (s.y > h + margin) { s.y = -margin; s.x = Math.random() * w; }
+      else if (s.y < -margin) { s.y = h + margin; s.x = Math.random() * w; }
+    }
+  }
+
+  private drawBackground(time: number) {
     const g = this.planetGfx;
     g.clear();
 
     for (const s of this.starField) {
-      g.fillStyle(0xffffff, s.a);
+      const tw = 0.75 + 0.25 * Math.sin(time * 0.002 + s.twinkle);
+      g.fillStyle(0xffffff, Math.min(1, s.a * tw));
       g.fillCircle(s.x, s.y, s.s);
     }
 
     const px = this.cx;
-    const py = this.cy - 120;
+    const py = this.cy - 340;
 
     g.fillStyle(0x2244aa, 0.06);
     g.fillCircle(px, py, 120);
@@ -228,18 +292,34 @@ export class MenuScene extends Phaser.Scene {
     g.strokeEllipse(px, py, 170, 170 * ringTilt);
   }
 
-  private createButton(x: number, y: number, label: string, cb: () => void) {
-    const btn = this.add.text(x, y, label, {
-      fontSize: '22px',
-      fontFamily: '"Segoe UI", system-ui, sans-serif',
-      color: '#4499cc',
-      padding: { x: 24, y: 8 },
-    }).setOrigin(0, 0.5).setDepth(10).setInteractive({ useHandCursor: true });
+  private createBoxButton(x: number, y: number, w: number, h: number, label: string, accent: number, cb: () => void): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y).setDepth(10);
+    const gfx = this.add.graphics();
 
-    btn.on('pointerover', () => { btn.setColor('#ffffff'); btn.setScale(1.05); });
-    btn.on('pointerout', () => { btn.setColor('#4499cc'); btn.setScale(1); });
-    btn.on('pointerdown', cb);
-    return btn;
+    const draw = (hover: boolean) => {
+      gfx.clear();
+      gfx.fillStyle(0x0b1224, hover ? 0.95 : 0.8);
+      gfx.fillRoundedRect(-w / 2, -h / 2, w, h, 8);
+      gfx.lineStyle(1.5, accent, hover ? 1 : 0.55);
+      gfx.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
+    };
+    draw(false);
+
+    const text = this.add.text(0, 0, label, {
+      fontSize: '17px',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#dbeaff',
+      fontStyle: 'bold',
+    } as any).setOrigin(0.5);
+    text.setLetterSpacing?.(2);
+
+    const hit = this.add.rectangle(0, 0, w, h, 0x000000, 0).setInteractive({ useHandCursor: true });
+    hit.on('pointerover', () => { draw(true); text.setColor('#ffffff'); });
+    hit.on('pointerout', () => { draw(false); text.setColor('#dbeaff'); });
+    hit.on('pointerdown', cb);
+
+    container.add([gfx, text, hit]);
+    return container;
   }
 
   private promptNameChange() {
@@ -248,10 +328,12 @@ export class MenuScene extends Phaser.Scene {
     const oldName = StorageManager.getGuardianName();
     openModal(oldName, (newName: string) => {
       StorageManager.renameGuardian(newName);
-      this.nameText.setText(`✎ ${newName}`);
+      this.nameText.setText(`✎  ${newName}`);
       if (this.showingLB) {
         this.leaderboardContainer.destroy();
+        if (this.leaderboardBackdrop) this.leaderboardBackdrop.destroy();
         this.buildLeaderboard();
+        this.leaderboardBackdrop.setVisible(true);
         this.leaderboardContainer.setVisible(true);
       }
     });
@@ -266,50 +348,71 @@ export class MenuScene extends Phaser.Scene {
     const panelW = m ? Math.min(sw - 24, 360) : 500;
     const panelH = m ? Math.min(sh - 40, 360) : 400;
 
+    this.leaderboardBackdrop = this.add.rectangle(this.cx, this.cy, this.scale.width * 2, this.scale.height * 2, 0x000000, 0.5)
+      .setDepth(49).setVisible(false).setInteractive();
+    if (!m) this.leaderboardBackdrop.on('pointerdown', () => this.toggleLeaderboard());
+
     this.leaderboardContainer = this.add.container(this.cx, this.cy).setDepth(50).setVisible(false);
 
-    const bg = this.add.rectangle(0, 0, panelW, panelH, 0x0a0a1a, 0.95).setStrokeStyle(2, 0x335577);
+    const bg = this.add.rectangle(0, 0, panelW, panelH, 0x0a0a1a, 0.95)
+      .setStrokeStyle(2, 0x335577)
+      .setInteractive();
     this.leaderboardContainer.add(bg);
 
-    const title = this.add.text(0, -panelH / 2 + 20, 'LEADERBOARD', {
+    const title = this.add.text(0, -panelH / 2 + 20, 'MY LEADERBOARD', {
       fontSize: m ? '18px' : '22px', fontFamily: '"Segoe UI", system-ui, sans-serif',
       color: '#4af', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.leaderboardContainer.add(title);
 
+    const entries = StorageManager.getLeaderboard().slice(0, 10);
     const colX = -panelW / 2 + 18;
-    if (!m) {
-      const header = this.add.text(colX, -panelH / 2 + 50, 'RANK   NAME             RANK        WAVE   SCORE', {
-        fontSize: '11px', fontFamily: 'monospace', color: '#556677',
+
+    if (entries.length === 0) {
+      const empty = this.add.text(0, 0, 'No scores stored yet.\nPlay a Competitive run to start your record.', {
+        fontSize: m ? '13px' : '15px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+        color: '#8899aa', align: 'center', lineSpacing: 6,
+      }).setOrigin(0.5);
+      this.leaderboardContainer.add(empty);
+    } else {
+      if (!m) {
+        const header = this.add.text(colX, -panelH / 2 + 50, 'RANK   NAME             RANK        WAVE   SCORE', {
+          fontSize: '11px', fontFamily: 'monospace', color: '#556677',
+        });
+        this.leaderboardContainer.add(header);
+      }
+
+      const rowStart = m ? -panelH / 2 + 50 : -panelH / 2 + 70;
+      const rowGap = m ? 22 : 26;
+
+      entries.forEach((e, i) => {
+        const rank = String(i + 1).padStart(2, ' ');
+        let rowStr: string;
+        if (m) {
+          const name = e.name.substring(0, 12).padEnd(12, ' ');
+          const wave = String(e.wave).padStart(3, ' ');
+          const score = String(e.score).padStart(6, ' ');
+          rowStr = `${rank}  ${name} W${wave} ${score}`;
+        } else {
+          const name = e.name.padEnd(16, ' ');
+          const titleStr = (e.title || '').padEnd(10, ' ');
+          const wave = String(e.wave).padStart(4, ' ');
+          const score = String(e.score).padStart(7, ' ');
+          rowStr = `${rank}     ${name} ${titleStr} ${wave}   ${score}`;
+        }
+        const row = this.add.text(colX, rowStart + i * rowGap, rowStr, {
+          fontSize: m ? '11px' : '13px', fontFamily: 'monospace',
+          color: i === 0 ? '#ffcc44' : i < 3 ? '#44aaff' : '#8899aa',
+        });
+        this.leaderboardContainer.add(row);
       });
-      this.leaderboardContainer.add(header);
     }
 
-    const entries = StorageManager.getLeaderboard().slice(0, 10);
-    const rowStart = m ? -panelH / 2 + 50 : -panelH / 2 + 70;
-    const rowGap = m ? 22 : 26;
-
-    entries.forEach((e, i) => {
-      const rank = String(i + 1).padStart(2, ' ');
-      let rowStr: string;
-      if (m) {
-        const name = e.name.substring(0, 12).padEnd(12, ' ');
-        const wave = String(e.wave).padStart(3, ' ');
-        const score = String(e.score).padStart(6, ' ');
-        rowStr = `${rank}  ${name} W${wave} ${score}`;
-      } else {
-        const name = e.name.padEnd(16, ' ');
-        const titleStr = (e.title || '').padEnd(10, ' ');
-        const wave = String(e.wave).padStart(4, ' ');
-        const score = String(e.score).padStart(7, ' ');
-        rowStr = `${rank}     ${name} ${titleStr} ${wave}   ${score}`;
-      }
-      const row = this.add.text(colX, rowStart + i * rowGap, rowStr, {
-        fontSize: m ? '11px' : '13px', fontFamily: 'monospace',
-        color: i === 0 ? '#ffcc44' : i < 3 ? '#44aaff' : '#8899aa',
-      });
-      this.leaderboardContainer.add(row);
-    });
+    const comingSoon = this.add.text(0, panelH / 2 - 48, '🌐  Global leaderboard coming soon', {
+      fontSize: m ? '11px' : '12px', fontFamily: '"Segoe UI", system-ui, sans-serif',
+      color: '#556677', fontStyle: 'italic',
+    }).setOrigin(0.5);
+    this.leaderboardContainer.add(comingSoon);
 
     const closeBtn = this.add.text(0, panelH / 2 - 20, '[ CLOSE ]', {
       fontSize: m ? '13px' : '14px', fontFamily: '"Segoe UI", system-ui, sans-serif', color: '#556677',
@@ -324,10 +427,13 @@ export class MenuScene extends Phaser.Scene {
     this.showingLB = !this.showingLB;
     if (this.showingLB) {
       this.leaderboardContainer.destroy();
+      if (this.leaderboardBackdrop) this.leaderboardBackdrop.destroy();
       this.buildLeaderboard();
+      this.leaderboardBackdrop.setVisible(true);
       this.leaderboardContainer.setVisible(true);
     } else {
       this.leaderboardContainer.setVisible(false);
+      this.leaderboardBackdrop.setVisible(false);
     }
   }
 
@@ -348,7 +454,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.aboutContainer = this.add.container(this.cx, this.cy).setDepth(60).setVisible(false);
 
-    const bg = this.add.rectangle(0, 0, panelW, panelH, 0x0a0a1a, 0.97).setStrokeStyle(2, 0x335577);
+    const bg = this.add.rectangle(0, 0, panelW, panelH, 0x0a0a1a, 0.97)
+      .setStrokeStyle(2, 0x335577)
+      .setInteractive();
     this.aboutContainer.add(bg);
 
     const panelTitle = this.add.text(0, -panelH / 2 + 28, 'HOW TO PLAY', {
@@ -461,7 +569,7 @@ export class MenuScene extends Phaser.Scene {
     // THE GAME
     y += hdr('THE GAME', y);
     y += body(
-      'Defend your planet core from endless waves of enemies. ' +
+      'Defend your planet from endless waves of enemies. ' +
       'Left-click to place force field walls that destroy anything they touch. ' +
       'Survive as long as you can — there is no final wave.',
       y,
@@ -487,7 +595,7 @@ export class MenuScene extends Phaser.Scene {
     y += item('Shooter', '#aa44ff',
       'Diamond shape. Stops at range and fires energy bolts (5 dmg each). 8 damage on contact. Appears from Wave 7.', y);
     y += item('Splitter', '#44ff44',
-      'Large hexagon. 10 damage. When destroyed far from the core, splits into 2–3 fast mini-drones (2 dmg each). Kill it close to the core for a clean kill. Appears from Wave 9.', y);
+      'Large hexagon. 10 damage. When destroyed far from the planet, splits into 2–3 fast mini-drones (2 dmg each). Kill it close to the planet for a clean kill. Appears from Wave 9.', y);
     y += item('Phaser', '#44ffff',
       'Octagon that flickers visible/invisible every 0.8s. Can only be hit while visible — passes through shields when invisible. 10 damage. Appears from Wave 12.', y);
     y += item('Shield Breaker', '#ff4444',
@@ -500,7 +608,7 @@ export class MenuScene extends Phaser.Scene {
     y += item('Carrier', '#ff8833',
       'Huge orange diamond. Very slow. Spawns drones every 3s (max 8). Takes 3 shield hits to destroy. Each hit staggers it for 2s. 25 damage. +500 score. Appears at Wave 10, 20, 30...', y);
     y += item('Siege Unit', '#44ddcc',
-      'Teal crescent that orbits the planet instead of charging it. Fires 3-bolt volleys every 2.5s. Orbit shrinks each lap. 1 shield hit kill. 30 damage if it reaches the core. +400 score. Appears at Wave 20, 30...', y);
+      'Teal crescent that orbits the planet instead of charging it. Fires 3-bolt volleys every 2.5s. Orbit shrinks each lap. 1 shield hit kill. 30 damage if it reaches the planet. +400 score. Appears at Wave 20, 30...', y);
 
     y += 6;
     y += hdr('SHIELD MECHANICS', y, '#88ddff');
@@ -524,9 +632,9 @@ export class MenuScene extends Phaser.Scene {
     );
     y += body(
       'Multi-Kill: A shield that kills 3–4 enemies = x1.5 score. 5–7 = x2. 8+ = x3.\n' +
-      'Close Call: +150 for killing an enemy very close to the core.\n' +
-      'Last Second: +100 for blocking a projectile near the core.\n' +
-      'Perfect Shield: +200 for clearing a wave with zero core damage.',
+      'Close Call: +150 for killing an enemy very close to the planet.\n' +
+      'Last Second: +100 for blocking a projectile near the planet.\n' +
+      'Perfect Shield: +200 for clearing a wave with zero planet damage.',
       y,
     );
 
@@ -535,7 +643,7 @@ export class MenuScene extends Phaser.Scene {
     y += body(
       'Consecutive zero-damage waves build a streak (shown as 🔥 on HUD). ' +
       'Each streak wave adds +0.5s to all shield durations. ' +
-      'Any core damage resets the streak to zero.',
+      'Any planet damage resets the streak to zero.',
       y,
     );
 
@@ -574,17 +682,17 @@ export class MenuScene extends Phaser.Scene {
     y += hdr('ITEMS', y, '#aabbcc');
 
     y += item('Gravity Field', '#44ffff',
-      'Right-click to place. Pushes nearby enemies away from the core for 3s. Buys time by shoving enemies back toward the screen edge.', y);
+      'Right-click to place. Pushes nearby enemies away from the planet for 3s. Buys time by shoving enemies back toward the screen edge.', y);
     y += item('Time Bender', '#ffffff',
       'All enemies slow to 30% speed for 4s. Shields work normally.', y);
     y += item('Health Surge', '#ff4444',
-      'Instantly restores 20 HP to the planet core (max 100).', y);
+      'Instantly restores 20 HP to the planet (max 100).', y);
     y += item('Star Bomb', '#ffdd44',
       'Your next shield placement triggers a massive explosion (3x shield radius). The shield still exists after the blast.', y);
     y += item('Time Freeze', '#aa44ff',
       'All enemies and projectiles freeze in place for 2.5s. You can still place shields to destroy them.', y);
     y += item('Star Shield', '#ffcc44',
-      'The planet core becomes invulnerable for 8s. Enemies that reach the core are destroyed but deal no damage. Golden dome visual with countdown ring.', y);
+      'The planet becomes invulnerable for 8s. Enemies that reach the planet are destroyed but deal no damage. Golden dome visual with countdown ring.', y);
     y += item('Cardinal Rift', '#ff44ff',
       'All enemies warp to the nearest cardinal direction (N/S/E/W). Consolidates scattered enemies into 4 predictable lanes.', y);
 
@@ -602,7 +710,7 @@ export class MenuScene extends Phaser.Scene {
     y += hdr('GAME MODES', y);
     y += body(
       'Competitive — Full game with scoring. Your score is saved to the leaderboard.\n' +
-      'Practice — No core damage, no score recording. Experiment freely.',
+      'Practice — No planet damage, no score recording. Experiment freely.',
       y,
     );
 

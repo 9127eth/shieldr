@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SHIELDR — Protect the Core</title>
+  <title>SHIELDR — Protect Your Planet</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0a1a; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -12,7 +12,7 @@
 
     #username-modal {
       position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.7);
       z-index: 1000;
       display: flex;
       align-items: center;
@@ -20,58 +20,118 @@
     }
     #username-modal.hidden { display: none !important; }
     .modal-box {
-      background: linear-gradient(135deg, #1a1a3e, #0d0d2b);
-      border: 2px solid #4af;
-      border-radius: 16px;
-      padding: 48px 40px;
+      position: relative;
+      background: rgba(11, 18, 36, 0.96);
+      border: 1.5px solid rgba(42, 74, 112, 0.9);
+      border-radius: 14px;
+      padding: 44px 48px 32px;
       text-align: center;
-      box-shadow: 0 0 80px rgba(68, 170, 255, 0.25);
-      min-width: 340px;
+      min-width: 360px;
+    }
+    .modal-box::before,
+    .modal-box::after,
+    .modal-box > .bracket-bl,
+    .modal-box > .bracket-br {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: #4aa4ff;
+      border-style: solid;
+      border-width: 0;
+    }
+    .modal-box::before {
+      top: 10px; left: 10px;
+      border-top-width: 2px; border-left-width: 2px;
+    }
+    .modal-box::after {
+      top: 10px; right: 10px;
+      border-top-width: 2px; border-right-width: 2px;
+    }
+    .modal-box > .bracket-bl {
+      bottom: 10px; left: 10px;
+      border-bottom-width: 2px; border-left-width: 2px;
+    }
+    .modal-box > .bracket-br {
+      bottom: 10px; right: 10px;
+      border-bottom-width: 2px; border-right-width: 2px;
     }
     .modal-box h2 {
-      color: #4af;
+      position: relative;
+      color: #ffffff;
       font-size: 22px;
-      margin-bottom: 6px;
+      margin-bottom: 18px;
       text-transform: uppercase;
-      letter-spacing: 3px;
+      letter-spacing: 4px;
+      font-weight: 700;
+    }
+    .modal-box h2::after {
+      content: '';
+      display: block;
+      width: 48px;
+      height: 2px;
+      background: #4aa4ff;
+      opacity: 0.85;
+      margin: 8px auto 0;
     }
     .modal-box p {
-      color: #667788;
+      color: #8899aa;
       font-size: 13px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
+      min-height: 18px;
     }
     #username-input {
-      background: #0a0a1a;
-      border: 2px solid #2a2a4a;
+      background: rgba(10, 16, 32, 0.9);
+      border: 1.5px solid #2a4a70;
       border-radius: 8px;
-      color: #fff;
-      font-size: 20px;
+      color: #dbeaff;
+      font-size: 18px;
       padding: 12px 20px;
       text-align: center;
       width: 260px;
       outline: none;
       letter-spacing: 2px;
       font-family: inherit;
+      font-weight: 600;
+      transition: border-color 0.15s;
     }
-    #username-input:focus { border-color: #4af; box-shadow: 0 0 20px rgba(68, 170, 255, 0.15); }
-    #username-input.error { border-color: #ff4466; box-shadow: 0 0 20px rgba(255, 68, 102, 0.2); }
-    #username-hint.error { color: #ff4466; }
-    #username-submit {
-      display: block;
-      margin: 24px auto 0;
-      background: linear-gradient(135deg, #4af, #27e);
-      border: none;
+    #username-input:focus { border-color: #4aa4ff; }
+    #username-input.error { border-color: #cc4455; }
+    #username-hint.error { color: #cc4455; }
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 26px;
+    }
+    .modal-btn {
+      background: rgba(11, 18, 36, 0.8);
+      border: 1.5px solid rgba(74, 164, 255, 0.55);
       border-radius: 8px;
-      color: #fff;
+      color: #dbeaff;
       font-size: 15px;
-      padding: 12px 44px;
+      padding: 10px 32px;
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 2px;
       font-family: inherit;
-      transition: transform 0.1s, box-shadow 0.2s;
+      font-weight: 700;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    #username-submit:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(68, 170, 255, 0.3); }
+    .modal-btn:hover {
+      background: rgba(11, 18, 36, 0.95);
+      border-color: #4aa4ff;
+      color: #ffffff;
+    }
+    .modal-btn.cancel {
+      border-color: rgba(102, 119, 136, 0.55);
+      color: #8899aa;
+    }
+    .modal-btn.cancel:hover {
+      border-color: #aabbcc;
+      color: #ffffff;
+    }
+    .modal-btn.hidden { display: none !important; }
 
     #storage-notice {
       display: none;
@@ -93,10 +153,15 @@
 
   <div id="username-modal">
     <div class="modal-box">
-      <h2>Enter Your Name</h2>
+      <span class="bracket-bl"></span>
+      <span class="bracket-br"></span>
+      <h2 id="username-title">Enter Your Name</h2>
       <p id="username-hint">&nbsp;</p>
       <input type="text" id="username-input" value="StarWard" autocomplete="off" spellcheck="false" />
-      <button id="username-submit">Begin</button>
+      <div class="modal-buttons">
+        <button id="username-cancel" class="modal-btn cancel hidden">Cancel</button>
+        <button id="username-submit" class="modal-btn">Begin</button>
+      </div>
     </div>
   </div>
 

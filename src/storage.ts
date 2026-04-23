@@ -47,12 +47,7 @@ export function getNextTitleTier(wave: number): { wave: number; title: string } 
   return null;
 }
 
-const DEFAULT_ENTRIES: LeaderboardEntry[] = [
-  { name: 'Orion', wave: 14, score: 4200, title: 'Guardian' },
-  { name: 'Nova', wave: 11, score: 3100, title: 'Defender' },
-  { name: 'Cosmo', wave: 8, score: 1800, title: 'Watcher' },
-  { name: 'Pixel', wave: 5, score: 900, title: 'Watcher' },
-];
+const DEFAULT_ENTRIES: LeaderboardEntry[] = [];
 
 export function createRunStats(): RunStats {
   return {
@@ -99,6 +94,15 @@ export class StorageManager {
 
   static setSeenIntro(): void {
     if (this.available) localStorage.setItem('shieldr_intro', '1');
+  }
+
+  static hasSeenItemIntro(): boolean {
+    if (!this.available) return false;
+    return localStorage.getItem('shieldr_item_intro') === '1';
+  }
+
+  static setSeenItemIntro(): void {
+    if (this.available) localStorage.setItem('shieldr_item_intro', '1');
   }
 
   static getVolume(): boolean {

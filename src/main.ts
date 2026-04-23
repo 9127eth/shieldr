@@ -23,12 +23,16 @@ const game = new Phaser.Game({
 // Username modal logic
 const MAX_NAME_LENGTH = 20;
 const modal = document.getElementById('username-modal')!;
+const modalBox = modal.querySelector('.modal-box') as HTMLElement;
+const title = document.getElementById('username-title')!;
 const input = document.getElementById('username-input') as HTMLInputElement;
-const submit = document.getElementById('username-submit')!;
+const submit = document.getElementById('username-submit') as HTMLButtonElement;
+const cancel = document.getElementById('username-cancel') as HTMLButtonElement;
 const notice = document.getElementById('storage-notice')!;
 const hint = document.getElementById('username-hint')!;
 
 let nameModalCallback: ((name: string) => void) | null = null;
+let isRename = false;
 
 function clearNameError() {
   hint.textContent = '\u00A0';
@@ -36,9 +40,18 @@ function clearNameError() {
   input.classList.remove('error');
 }
 
+function closeNameModal() {
+  modal.classList.add('hidden');
+  nameModalCallback = null;
+}
+
 function openNameModal(currentName: string, onDone: (name: string) => void) {
   input.value = currentName;
   nameModalCallback = onDone;
+  isRename = StorageManager.hasSeenIntro();
+  title.textContent = isRename ? 'Change Your Name' : 'Enter Your Name';
+  submit.textContent = isRename ? 'Save' : 'Begin';
+  cancel.classList.toggle('hidden', !isRename);
   clearNameError();
   modal.classList.remove('hidden');
   input.focus();
@@ -66,9 +79,23 @@ function confirmName() {
 input.addEventListener('input', clearNameError);
 
 submit.addEventListener('click', confirmName);
+cancel.addEventListener('click', closeNameModal);
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') confirmName();
+  else if (e.key === 'Escape' && isRename) closeNameModal();
 });
+
+// Stop clicks/right-clicks inside the modal from reaching the Phaser canvas.
+const swallow = (e: Event) => e.stopPropagation();
+modal.addEventListener('pointerdown', swallow);
+modal.addEventListener('mousedown', swallow);
+modal.addEventListener('contextmenu', swallow);
+
+// Click outside the panel dismisses (only when renaming, not during first-time intro).
+modal.addEventListener('click', (e) => {
+  if (e.target === modal && isRename) closeNameModal();
+});
+modalBox.addEventListener('click', (e) => e.stopPropagation());
 
 if (!StorageManager.available) {
   modal.classList.add('hidden');
